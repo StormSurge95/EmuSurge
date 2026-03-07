@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="EmuSurge.vcxproj" Id="b96abeb8-4629-4aad-b322-0a42a0b118a7" />
+</Solution>
