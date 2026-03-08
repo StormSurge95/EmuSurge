@@ -31,8 +31,8 @@
     <Filter Include="Source Files\nes">
       <UniqueIdentifier>{ac2c6cd0-db71-4afd-b833-58f1a3e61b20}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\debug">
-      <UniqueIdentifier>{86e99371-aaeb-49ce-92a5-b91512ade07c}</UniqueIdentifier>
+    <Filter Include="Header Files\devtools">
+      <UniqueIdentifier>{c1850d89-4101-4eba-8757-6b4dfa312793}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -84,14 +84,14 @@
     <ClInclude Include="common\format_utils.h">
       <Filter>Header Files\common</Filter>
     </ClInclude>
-    <ClInclude Include="debug\DebugState.h">
-      <Filter>Header Files\debug</Filter>
+    <ClInclude Include="devtools\BreakpointManager.h">
+      <Filter>Header Files\devtools</Filter>
     </ClInclude>
-    <ClInclude Include="debug\BreakpointManager.h">
-      <Filter>Header Files\debug</Filter>
+    <ClInclude Include="devtools\TraceLogger.h">
+      <Filter>Header Files\devtools</Filter>
     </ClInclude>
-    <ClInclude Include="debug\TraceLogger.h">
-      <Filter>Header Files\debug</Filter>
+    <ClInclude Include="devtools\DebugState.h">
+      <Filter>Header Files\devtools</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

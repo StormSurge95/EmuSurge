@@ -131,9 +131,9 @@
     <ClInclude Include="common\format_utils.h" />
     <ClInclude Include="common\types.h" />
     <ClInclude Include="core\emulator_core.h" />
-    <ClInclude Include="debug\BreakpointManager.h" />
-    <ClInclude Include="debug\DebugState.h" />
-    <ClInclude Include="debug\TraceLogger.h" />
+    <ClInclude Include="devtools\BreakpointManager.h" />
+    <ClInclude Include="devtools\DebugState.h" />
+    <ClInclude Include="devtools\TraceLogger.h" />
     <ClInclude Include="frontend\application.h" />
     <ClInclude Include="frontend\audio.h" />
     <ClInclude Include="frontend\emulator_manager.h" />
