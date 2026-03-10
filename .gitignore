@@ -399,6 +399,9 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
+# SDL3 library (it can be found elsewhere and there's no need to include it in the github repo)
+SDL3/
+
 ### VisualStudio Patch ###
 # Additional files built by Visual Studio
 

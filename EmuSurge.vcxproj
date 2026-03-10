@@ -70,6 +70,19 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>
+    </IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <IncludePath />
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <IncludePath />
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath />
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -77,6 +90,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>SDL3/include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -92,6 +106,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>SDL3/include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -105,6 +120,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>SDL3/include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -120,6 +136,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>SDL3/include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -127,39 +144,29 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="common\file_utils.h" />
-    <ClInclude Include="common\format_utils.h" />
-    <ClInclude Include="common\types.h" />
-    <ClInclude Include="core\emulator_core.h" />
-    <ClInclude Include="devtools\BreakpointManager.h" />
-    <ClInclude Include="devtools\DebugState.h" />
-    <ClInclude Include="devtools\TraceLogger.h" />
-    <ClInclude Include="frontend\application.h" />
-    <ClInclude Include="frontend\audio.h" />
-    <ClInclude Include="frontend\emulator_manager.h" />
-    <ClInclude Include="frontend\input.h" />
-    <ClInclude Include="frontend\video.h" />
-    <ClInclude Include="nes\bus.h" />
-    <ClInclude Include="nes\cartridge.h" />
-    <ClInclude Include="nes\cpu.h" />
-    <ClInclude Include="nes\mapper.h" />
-    <ClInclude Include="nes\nes.h" />
-    <ClInclude Include="nes\NROM.h" />
-    <ClInclude Include="nes\ppu.h" />
+    <ProjectReference Include="SDL3\VisualC\SDL\SDL.vcxproj">
+      <Project>{81ce8daf-ebb2-4761-8e45-b71abcca8c68}</Project>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="frontend\application.cpp" />
-    <ClCompile Include="frontend\audio.cpp" />
-    <ClCompile Include="frontend\emulator_manager.cpp" />
-    <ClCompile Include="frontend\input.cpp" />
-    <ClCompile Include="frontend\main.cpp" />
-    <ClCompile Include="frontend\video.cpp" />
-    <ClCompile Include="nes\bus.cpp" />
-    <ClCompile Include="nes\cartridge.cpp" />
-    <ClCompile Include="nes\cpu.cpp" />
-    <ClCompile Include="nes\nes.cpp" />
-    <ClCompile Include="nes\NROM.cpp" />
-    <ClCompile Include="nes\ppu.cpp" />
+    <ClInclude Include="src\core\Bus.h" />
+    <ClInclude Include="src\core\Device.h" />
+    <ClInclude Include="src\core\Helpers.h" />
+    <ClInclude Include="src\core\IConsole.h" />
+    <ClInclude Include="src\core\RAM.h" />
+    <ClInclude Include="src\core\VideoTypes.h" />
+    <ClInclude Include="src\systems\NES\Cartridge.h" />
+    <ClInclude Include="src\systems\NES\NES.h" />
+    <ClInclude Include="src\systems\NES\NES_CPU.h" />
+    <ClInclude Include="src\systems\NES\NES_PPU.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\frontend\SDLRenderer.cpp" />
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\systems\NES\Cartridge.cpp" />
+    <ClCompile Include="src\systems\NES\NES.cpp" />
+    <ClCompile Include="src\systems\NES\NES_CPU.cpp" />
+    <ClCompile Include="src\systems\NES\NES_PPU.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

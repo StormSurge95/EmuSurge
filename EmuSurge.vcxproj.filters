@@ -13,123 +13,75 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Header Files\frontend">
-      <UniqueIdentifier>{d972d697-3e4a-4880-8549-14eaaab79c66}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\core">
-      <UniqueIdentifier>{0ed583ff-6b44-4bab-9513-0df353f9a77d}</UniqueIdentifier>
+      <UniqueIdentifier>{e9afc50a-f2cf-49c1-b97d-fac18ad29186}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\nes">
-      <UniqueIdentifier>{aaca8371-e4df-4065-9931-897cc70da6ea}</UniqueIdentifier>
+    <Filter Include="Header Files\systems">
+      <UniqueIdentifier>{37c93b33-bd71-4def-8f27-90b9165aa33f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\common">
-      <UniqueIdentifier>{76432fee-371a-438b-b8f6-d69bd416f2ff}</UniqueIdentifier>
+    <Filter Include="Header Files\frontend">
+      <UniqueIdentifier>{95787dc5-0920-43ca-9702-35705316aa6a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\frontend">
-      <UniqueIdentifier>{80f810dc-27e1-44a2-9a61-421617a9a74c}</UniqueIdentifier>
+    <Filter Include="Source Files\systems">
+      <UniqueIdentifier>{9410345f-8c55-4d93-977f-cdf4e055d787}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\nes">
-      <UniqueIdentifier>{ac2c6cd0-db71-4afd-b833-58f1a3e61b20}</UniqueIdentifier>
+    <Filter Include="Source Files\systems\NES">
+      <UniqueIdentifier>{c5c28099-8613-4b9c-8d61-41f6b3186eba}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\devtools">
-      <UniqueIdentifier>{c1850d89-4101-4eba-8757-6b4dfa312793}</UniqueIdentifier>
+    <Filter Include="Header Files\systems\NES">
+      <UniqueIdentifier>{47e52f69-8966-4f8d-9a68-03f002252e58}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="frontend\application.h">
-      <Filter>Header Files\frontend</Filter>
-    </ClInclude>
-    <ClInclude Include="frontend\audio.h">
-      <Filter>Header Files\frontend</Filter>
-    </ClInclude>
-    <ClInclude Include="frontend\emulator_manager.h">
-      <Filter>Header Files\frontend</Filter>
-    </ClInclude>
-    <ClInclude Include="frontend\input.h">
-      <Filter>Header Files\frontend</Filter>
-    </ClInclude>
-    <ClInclude Include="frontend\video.h">
-      <Filter>Header Files\frontend</Filter>
-    </ClInclude>
-    <ClInclude Include="core\emulator_core.h">
+    <ClInclude Include="src\core\Bus.h">
       <Filter>Header Files\core</Filter>
     </ClInclude>
-    <ClInclude Include="nes\bus.h">
-      <Filter>Header Files\nes</Filter>
+    <ClInclude Include="src\core\Device.h">
+      <Filter>Header Files\core</Filter>
     </ClInclude>
-    <ClInclude Include="nes\cartridge.h">
-      <Filter>Header Files\nes</Filter>
+    <ClInclude Include="src\core\IConsole.h">
+      <Filter>Header Files\core</Filter>
     </ClInclude>
-    <ClInclude Include="nes\cpu.h">
-      <Filter>Header Files\nes</Filter>
+    <ClInclude Include="src\core\VideoTypes.h">
+      <Filter>Header Files\core</Filter>
     </ClInclude>
-    <ClInclude Include="nes\nes.h">
-      <Filter>Header Files\nes</Filter>
+    <ClInclude Include="src\systems\NES\NES.h">
+      <Filter>Header Files\systems\NES</Filter>
     </ClInclude>
-    <ClInclude Include="nes\ppu.h">
-      <Filter>Header Files\nes</Filter>
+    <ClInclude Include="src\core\RAM.h">
+      <Filter>Header Files\core</Filter>
     </ClInclude>
-    <ClInclude Include="common\file_utils.h">
-      <Filter>Header Files\common</Filter>
+    <ClInclude Include="src\systems\NES\Cartridge.h">
+      <Filter>Header Files\systems\NES</Filter>
     </ClInclude>
-    <ClInclude Include="common\types.h">
-      <Filter>Header Files\common</Filter>
+    <ClInclude Include="src\systems\NES\NES_CPU.h">
+      <Filter>Header Files\systems\NES</Filter>
     </ClInclude>
-    <ClInclude Include="nes\mapper.h">
-      <Filter>Header Files\nes</Filter>
+    <ClInclude Include="src\systems\NES\NES_PPU.h">
+      <Filter>Header Files\systems\NES</Filter>
     </ClInclude>
-    <ClInclude Include="nes\NROM.h">
-      <Filter>Header Files\nes</Filter>
-    </ClInclude>
-    <ClInclude Include="common\format_utils.h">
-      <Filter>Header Files\common</Filter>
-    </ClInclude>
-    <ClInclude Include="devtools\BreakpointManager.h">
-      <Filter>Header Files\devtools</Filter>
-    </ClInclude>
-    <ClInclude Include="devtools\TraceLogger.h">
-      <Filter>Header Files\devtools</Filter>
-    </ClInclude>
-    <ClInclude Include="devtools\DebugState.h">
-      <Filter>Header Files\devtools</Filter>
+    <ClInclude Include="src\core\Helpers.h">
+      <Filter>Header Files\core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="nes\bus.cpp">
-      <Filter>Source Files\nes</Filter>
+    <ClCompile Include="src\frontend\SDLRenderer.cpp">
+      <Filter>Header Files\frontend</Filter>
     </ClCompile>
-    <ClCompile Include="nes\cartridge.cpp">
-      <Filter>Source Files\nes</Filter>
+    <ClCompile Include="src\systems\NES\Cartridge.cpp">
+      <Filter>Source Files\systems\NES</Filter>
     </ClCompile>
-    <ClCompile Include="nes\cpu.cpp">
-      <Filter>Source Files\nes</Filter>
+    <ClCompile Include="src\systems\NES\NES.cpp">
+      <Filter>Source Files\systems\NES</Filter>
     </ClCompile>
-    <ClCompile Include="nes\nes.cpp">
-      <Filter>Source Files\nes</Filter>
+    <ClCompile Include="src\systems\NES\NES_CPU.cpp">
+      <Filter>Source Files\systems\NES</Filter>
     </ClCompile>
-    <ClCompile Include="nes\ppu.cpp">
-      <Filter>Source Files\nes</Filter>
+    <ClCompile Include="src\systems\NES\NES_PPU.cpp">
+      <Filter>Source Files\systems\NES</Filter>
     </ClCompile>
-    <ClCompile Include="frontend\application.cpp">
-      <Filter>Source Files\frontend</Filter>
-    </ClCompile>
-    <ClCompile Include="frontend\audio.cpp">
-      <Filter>Source Files\frontend</Filter>
-    </ClCompile>
-    <ClCompile Include="frontend\emulator_manager.cpp">
-      <Filter>Source Files\frontend</Filter>
-    </ClCompile>
-    <ClCompile Include="frontend\input.cpp">
-      <Filter>Source Files\frontend</Filter>
-    </ClCompile>
-    <ClCompile Include="frontend\main.cpp">
-      <Filter>Source Files\frontend</Filter>
-    </ClCompile>
-    <ClCompile Include="frontend\video.cpp">
-      <Filter>Source Files\frontend</Filter>
-    </ClCompile>
-    <ClCompile Include="nes\NROM.cpp">
-      <Filter>Source Files\nes</Filter>
+    <ClCompile Include="src\main.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
