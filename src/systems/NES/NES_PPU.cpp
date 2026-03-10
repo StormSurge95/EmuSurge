@@ -8,6 +8,7 @@ void NES_PPU::write(uint16_t addr, uint8_t data) {
     switch (addr) {
         case 0x0: // PPUCTRL
             control = data;
+            t = (t & 0xF3FF) | ((uint16_t)(data & 0x03) << 10);
             break;
         case 0x1: // PPUMASK
             mask = data;
@@ -202,9 +203,28 @@ uint8_t NES_PPU::ppuRead(uint16_t addr) {
         return data;
     } else if (addr >= 0x2000 && addr <= 0x3EFF) {
         addr &= 0x0FFF;
-        data = tblName[addr % 2048];
+        if (cart->getMirror() == Cartridge::VERTICAL) {
+            uint16_t A = addr & 0x03FF;
+            uint16_t B = addr & 0x03FF | 0x0400;
+            if (addr <= 0x03FF) data = tblName[A];
+            else if (addr <= 0x07FF) data = tblName[B];
+            else if (addr <= 0x0BFF) data = tblName[A];
+            else data = tblName[B];
+        } else {
+            uint16_t A = addr & 0x03FF;
+            uint16_t B = addr & 0x03FF | 0x0400;
+            if (addr <= 0x03FF) data = tblName[A];
+            else if (addr <= 0x07FF) data = tblName[A];
+            else if (addr <= 0x0BFF) data = tblName[B];
+            else data = tblName[B];
+
+        }
     } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
         addr &= 0x001F;
+        if (addr == 0x10) addr = 0x00;
+        else if (addr == 0x14) addr = 0x04;
+        else if (addr == 0x18) addr = 0x08;
+        else if (addr == 0x1C) addr = 0x0C;
         data = tblPalette[addr];
     }
 
@@ -218,8 +238,20 @@ void NES_PPU::ppuWrite(uint16_t addr, uint8_t data) {
         // Cartridge handled it
     } else if (addr >= 0x2000 && addr <= 0x3EFF) {
         addr &= 0x0FFF;
-        addr %= 2048;
-        tblName[addr] = data;
+
+        uint16_t A = addr & 0x03FF;
+        uint16_t B = addr & 0x03FF | 0x0400;
+        if (cart->getMirror() == Cartridge::VERTICAL) {
+            if (addr <= 0x03FF) tblName[A] = data;
+            else if (addr <= 0x07FF) tblName[B] = data;
+            else if (addr <= 0x0BFF) tblName[A] = data;
+            else tblName[B] = data;
+        } else {
+            if (addr <= 0x03FF) tblName[A] = data;
+            else if (addr <= 0x07FF) tblName[A] = data;
+            else if (addr <= 0x0BFF) tblName[B] = data;
+            else tblName[B] = data;
+        }
     } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
         addr &= 0x001F;
         if (addr == 0x10) addr = 0x00;

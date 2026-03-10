@@ -26,6 +26,8 @@ Cartridge::Cartridge(const std::string& filename) {
     // get mapper id
     mapperID = ((header.flags7 >> 4) << 4) | (header.flags6 >> 4);
 
+    mirror = (header.flags6 & 0x01) ? VERTICAL : HORIZONTAL;
+
     // read prgMemory
     prgMemory.resize((size_t)prgBanks * 16384);
     file.read(reinterpret_cast<char*>(prgMemory.data()), prgMemory.size());

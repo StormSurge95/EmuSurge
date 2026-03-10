@@ -20,6 +20,11 @@ struct INESHeader {
 
 class Cartridge : public Device {
     public:
+        enum MIRROR {
+            HORIZONTAL,
+            VERTICAL
+        };
+
         Cartridge(const std::string& filename);
 
         bool isValid() const { return valid; }
@@ -30,12 +35,15 @@ class Cartridge : public Device {
         bool ppuRead(uint16_t addr, uint8_t& data);
         bool ppuWrite(uint16_t addr, uint8_t data);
 
+        inline MIRROR getMirror() const { return mirror; }
+
     private:
         bool valid = false;
 
         uint8_t mapperID = 0;
         uint8_t prgBanks = 0;
         uint8_t chrBanks = 0;
+        MIRROR mirror = HORIZONTAL;
 
         std::vector<uint8_t> prgMemory;
         std::vector<uint8_t> chrMemory;

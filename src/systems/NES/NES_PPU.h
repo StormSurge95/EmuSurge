@@ -30,8 +30,8 @@ class NES_PPU : public Device {
         static constexpr int SCREEN_WIDTH = 256;
         static constexpr int SCREEN_HEIGHT = 240;
 
-        uint16_t scanline = 0;
-        uint16_t cycle = 0;
+        int16_t scanline = 0;
+        int16_t cycle = 0;
 
         uint8_t control = 0;    // $2000
         uint8_t mask = 0;       // $2001

@@ -301,7 +301,7 @@ class NES_CPU : public Device {
             return 0;
         }
         inline uint8_t BVC() {
-            if (getFlag(V) == 1) {
+            if (getFlag(V) == 0) {
                 cycles++;
 
                 addrAbs = pc + addrRel;
@@ -315,7 +315,7 @@ class NES_CPU : public Device {
             return 0;
         }
         inline uint8_t BVS() {
-            if (getFlag(V) == 0) {
+            if (getFlag(V) == 1) {
                 cycles++;
 
                 addrAbs = pc + addrRel;
@@ -401,8 +401,8 @@ class NES_CPU : public Device {
         inline uint8_t DEY() {
             y--;
 
-            setFlag(Z, x == 0);
-            setFlag(N, x & 0x80);
+            setFlag(Z, y == 0);
+            setFlag(N, y & 0x80);
 
             return 0;
         }
@@ -491,7 +491,7 @@ class NES_CPU : public Device {
 
             uint16_t t = (uint16_t)fetched >> 1;
 
-            setFlag(C, fetched & 0x80);
+            setFlag(C, fetched & 0x01);
             setFlag(Z, (t & 0xFF) == 0);
             setFlag(N, t & 0x80);
 
@@ -538,7 +538,7 @@ class NES_CPU : public Device {
         inline uint8_t ROL() {
             fetch();
 
-            uint8_t t = (fetched << 1) & getFlag(C);
+            uint8_t t = (fetched << 1) | getFlag(C);
 
             setFlag(C, fetched & 0x80);
             setFlag(Z, t == 0);
@@ -554,7 +554,7 @@ class NES_CPU : public Device {
         inline uint8_t ROR() {
             fetch();
 
-            uint8_t t = (fetched >> 1) & (getFlag(C) << 7);
+            uint8_t t = (fetched >> 1) | (getFlag(C) << 7);
 
             setFlag(C, fetched & 0x01);
             setFlag(Z, t == 0);
@@ -647,8 +647,8 @@ class NES_CPU : public Device {
         inline uint8_t TSX() {
             x = sp;
 
-            setFlag(Z, y == 0);
-            setFlag(N, y & 0x80);
+            setFlag(Z, x == 0);
+            setFlag(N, x & 0x80);
 
             return 0;
         }
