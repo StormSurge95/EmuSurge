@@ -10,8 +10,8 @@ struct INESHeader {
     char name[4];       // "NES<EOF>"
     uint8_t prgChunks;  // num 16KB PRG banks
     uint8_t chrChunks;  // num 8KB CHR banks
-    uint8_t flags6;
-    uint8_t flags7;
+    uint8_t flags6;     // MMMMntrm
+    uint8_t flags7;     // MMMM----
     uint8_t prgRamSize;
     uint8_t tvSystem1;
     uint8_t tvSystem2;

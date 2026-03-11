@@ -69,7 +69,8 @@ bool Cartridge::ppuRead(uint16_t addr, uint8_t& data) {
 
 bool Cartridge::ppuWrite(uint16_t addr, uint8_t data) {
     if (addr < 0x2000) {
-        if (chrMemory.size() > 0) {
+        if (chrBanks == 0) {
+            printf("CHR WRITE: %04X = %02X\n", addr, data);
             chrMemory[addr] = data;
             return true;
         }

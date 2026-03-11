@@ -12,7 +12,7 @@ int main(int argc, int* argv[]) {
     const int WIDTH = nes->getScreenWidth();
     const int HEIGHT = nes->getScreenHeight();
 
-    SDL_Window* win = SDL_CreateWindow("EmuSurge", WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE);
+    SDL_Window* win = SDL_CreateWindow("EmuSurge", WIDTH * 4, HEIGHT * 4, SDL_WINDOW_RESIZABLE);
     if (win != nullptr) {
         SDL_Renderer* ren = SDL_CreateRenderer(win, NULL);
         if (ren != nullptr) {
@@ -30,7 +30,13 @@ int main(int argc, int* argv[]) {
                             quit = true;
                     }
 
-                    nes->clock();
+                    try {
+                        nes->clock();
+                    }
+                    catch (const std::exception& e) {
+                        printf(e.what());
+                        quit = true;
+                    }
 
                     SDL_UpdateTexture(tex, NULL, nes->getFrameBuffer(), WIDTH * sizeof(uint32_t));
 
