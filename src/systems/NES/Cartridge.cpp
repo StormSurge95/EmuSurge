@@ -28,6 +28,8 @@ Cartridge::Cartridge(const std::string& filename) {
 
     mirror = (header.flags6 & 0x01) ? VERTICAL : HORIZONTAL;
 
+    if (header.flags6 & 0x04) file.seekg(file.cur + 512);
+
     // read prgMemory
     prgMemory.resize((size_t)prgBanks * 16384);
     file.read(reinterpret_cast<char*>(prgMemory.data()), prgMemory.size());
@@ -35,7 +37,7 @@ Cartridge::Cartridge(const std::string& filename) {
     if (chrBanks == 0) {
         chrMemory.resize(8192);
     } else {
-        chrMemory.resize(chrBanks * 8192);
+        chrMemory.resize((size_t)chrBanks * 8192);
         file.read(reinterpret_cast<char*>(chrMemory.data()), chrMemory.size());
     }
 

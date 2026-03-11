@@ -49,7 +49,8 @@ void NES::clock() {
     do {
         ppu.get()->clock();
 
-        if (systemClockCounter % 3 == 0) cpu.get()->clock();
+        if (systemClockCounter % 3 == 0)
+            cpu.get()->clock();
 
         if (ppu.get()->nmi) {
             printf("requesting NMI execution from CPU...\n");

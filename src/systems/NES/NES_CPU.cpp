@@ -19,7 +19,7 @@ NES_CPU::NES_CPU() {
         /*0x50                           0x51                           0x52                           0x53                          0x54                           0x55                           0x56                           0x57                          0x58                           0x59                           0x5A                           0x5B                           0x5C                           0x5D                           0x5E                           0x5F*/
         { "BVC",&a::BVC,&a::REL,2,2 }, { "EOR",&a::EOR,&a::IZY,5,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "NOP",&a::NOP,&a::ZPX,4,2 }, { "EOR",&a::EOR,&a::ZPX,4,2 }, { "LSR",&a::LSR,&a::ZPX,6,2 }, { "???",&a::XXX,&a::IMP,6,1 },{ "CLI",&a::CLI,&a::IMP,2,1 }, { "EOR",&a::EOR,&a::ABY,4,3 }, { "NOP",&a::NOP,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,7,1 }, { "NOP",&a::NOP,&a::ABX,4,3 }, { "EOR",&a::EOR,&a::ABX,4,3 }, { "LSR",&a::LSR,&a::ABX,7,3 }, { "???",&a::XXX,&a::IMP,7,1 },
         /*0x60                           0x61                           0x62                           0x63                          0x64                           0x65                           0x66                           0x67                          0x68                           0x69                           0x6A                           0x6B                           0x6C                           0x6D                           0x6E                           0x6F*/
-        { "RTS",&a::RTS,&a::IMP,6,1 }, { "ADC",&a::ADC,&a::IZX,6,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "NOP",&a::NOP,&a::ZP0,3,2 }, { "ADC",&a::ADC,&a::ZP0,3,2 }, { "ROR",&a::ROR,&a::ZP0,5,2 }, { "???",&a::XXX,&a::IMP,5,1 },{ "PLA",&a::PLA,&a::IMP,4,1 }, { "ADC",&a::ADC,&a::IMM,2,2 }, { "ROR",&a::ROR,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,2,1 }, { "JMP",&a::JMP,&a::IZY,5,3 }, { "ADC",&a::ADC,&a::ABS,4,3 }, { "ROR",&a::ROR,&a::ABS,6,3 }, { "???",&a::XXX,&a::IMP,6,1 },
+        { "RTS",&a::RTS,&a::IMP,6,1 }, { "ADC",&a::ADC,&a::IZX,6,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "NOP",&a::NOP,&a::ZP0,3,2 }, { "ADC",&a::ADC,&a::ZP0,3,2 }, { "ROR",&a::ROR,&a::ZP0,5,2 }, { "???",&a::XXX,&a::IMP,5,1 },{ "PLA",&a::PLA,&a::IMP,4,1 }, { "ADC",&a::ADC,&a::IMM,2,2 }, { "ROR",&a::ROR,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,2,1 }, { "JMP",&a::JMP,&a::IND,5,3 }, { "ADC",&a::ADC,&a::ABS,4,3 }, { "ROR",&a::ROR,&a::ABS,6,3 }, { "???",&a::XXX,&a::IMP,6,1 },
         /*0x70                           0x71                           0x72                           0x73                          0x74                           0x75                           0x76                           0x77                          0x78                           0x79                           0x7A                           0x7B                           0x7C                           0x7D                           0x7E                           0x7F*/
         { "BVS",&a::BVS,&a::REL,2,2 }, { "ADC",&a::ADC,&a::IZY,5,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "NOP",&a::NOP,&a::ZPX,4,2 }, { "ADC",&a::ADC,&a::ZPX,4,2 }, { "ROR",&a::ROR,&a::ZPX,6,2 }, { "???",&a::XXX,&a::IMP,6,1 },{ "SEI",&a::SEI,&a::IMP,2,1 }, { "ADC",&a::ADC,&a::ABY,4,3 }, { "NOP",&a::NOP,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,7,1 }, { "NOP",&a::NOP,&a::ABX,4,3 }, { "ADC",&a::ADC,&a::ABX,4,3 }, { "ROR",&a::ROR,&a::ABX,7,3 }, { "???",&a::XXX,&a::IMP,7,1 },
         /*0x80                           0x81                           0x82                           0x83                          0x84                           0x85                           0x86                           0x87                          0x88                           0x89                           0x8A                           0x8B                           0x8C                           0x8D                           0x8E                           0x8F*/
@@ -68,6 +68,8 @@ void NES_CPU::reset() {
     uint16_t hi = read(0xFFFD);
 
     pc = (hi << 8) | lo;
+
+    pc = 0xC000;
 
     addrRel = 0;
     addrAbs = 0;
@@ -190,7 +192,7 @@ std::string NES_CPU::trace() {
     if (inst.bytes >= 2)
         ss << hex(b1, 2) << " ";
     else
-        ss << "  ";
+        ss << "   ";
 
     if (inst.bytes == 3)
         ss << hex(b2, 2);

@@ -3,7 +3,7 @@
 #include "./systems/NES/NES.h"
 
 int main(int argc, int* argv[]) {
-    NES* nes = new NES();
+    NES* nes = new NES(true);
     if (!nes->loadCartridge("C:/roms/NES/Super_Mario_Bros.nes")) return 1;
 
     if (!SDL_Init(SDL_INIT_VIDEO))
@@ -12,11 +12,12 @@ int main(int argc, int* argv[]) {
     const int WIDTH = nes->getScreenWidth();
     const int HEIGHT = nes->getScreenHeight();
 
-    SDL_Window* win = SDL_CreateWindow("EmuSurge", WIDTH * 8, HEIGHT * 8, NULL);
+    SDL_Window* win = SDL_CreateWindow("EmuSurge", WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE);
     if (win != nullptr) {
         SDL_Renderer* ren = SDL_CreateRenderer(win, NULL);
         if (ren != nullptr) {
             SDL_SetDefaultTextureScaleMode(ren, SDL_SCALEMODE_PIXELART);
+            SDL_SetRenderLogicalPresentation(ren, WIDTH, HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX);
 
             SDL_Texture* tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB32, SDL_TEXTUREACCESS_STATIC, WIDTH, HEIGHT);
             if (tex != nullptr) {

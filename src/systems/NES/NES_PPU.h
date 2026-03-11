@@ -81,4 +81,5 @@ class NES_PPU : public Device {
         void loadBackgroundShifters();
 
         uint32_t getColorFromPalette(uint8_t palette, uint8_t pixel);
+        void plot(size_t x, size_t y, uint32_t color);
 };

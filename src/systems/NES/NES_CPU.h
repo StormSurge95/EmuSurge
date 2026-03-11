@@ -125,6 +125,8 @@ class NES_CPU : public Device {
             uint16_t ptr = (phi << 8) | plo;
             uint16_t lo = read(ptr);
             uint16_t hi = read(ptr + 1);
+            if (plo == 0x00FF)
+                hi = read(ptr & 0xFF00);
             addrAbs = (hi << 8) | lo;
             return 0;
         }
@@ -234,8 +236,8 @@ class NES_CPU : public Device {
             uint8_t t = a & fetched;
 
             setFlag(Z, t == 0);
-            setFlag(V, t & 0x40);
-            setFlag(N, t & 0x80);
+            setFlag(V, fetched & 0x40);
+            setFlag(N, fetched & 0x80);
 
             return 0;
         }
@@ -533,6 +535,8 @@ class NES_CPU : public Device {
         }
         inline uint8_t PLP() {
             status = pop();
+            status &= ~B;
+            status |= U;
             return 0;
         }
         inline uint8_t ROL() {
@@ -568,7 +572,7 @@ class NES_CPU : public Device {
             return 0;
         }
         inline uint8_t RTI() {
-            status = pop();
+            status = pop() | U;
 
             uint8_t lo = pop();
             uint8_t hi = pop();
@@ -589,12 +593,11 @@ class NES_CPU : public Device {
         inline uint8_t SBC() {
             fetch();
 
-            uint16_t t = (uint16_t)a + (uint16_t)~fetched + (uint16_t)getFlag(C);
+            int16_t t = (int16_t)a + (int16_t)~fetched + (int16_t)getFlag(C);
 
-            setFlag(C, t > 255);
+            setFlag(C, !(t < 0x00));
             setFlag(Z, (t & 0xFF) == 0);
-            setFlag(V, (~((uint16_t)a ^ (uint16_t)fetched) &
-                        ((uint16_t)a ^ t)) & 0x80);
+            setFlag(V, (t ^ a) & (t ^ ~fetched) & 0x80);
             setFlag(N, t & 0x80);
 
             a = t & 0xFF;

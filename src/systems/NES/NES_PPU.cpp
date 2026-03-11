@@ -89,6 +89,10 @@ uint8_t NES_PPU::read(uint16_t addr, bool readonly) {
     }
 }
 
+void NES_PPU::plot(size_t x, size_t y, uint32_t color) {
+    frameBuffer[y * SCREEN_WIDTH + x] = color;
+}
+
 void NES_PPU::clock() {
     if (scanline >= 0 && scanline < 240) {
         if (cycle >= 1 && cycle <= 256) {
@@ -108,7 +112,7 @@ void NES_PPU::clock() {
             uint8_t palette = (a1 << 1) | a0;
 
             uint32_t color = getColorFromPalette(palette, pixel);
-            frameBuffer[(size_t)scanline * SCREEN_WIDTH + ((size_t)cycle - 1)] = color;
+            plot((size_t)cycle - 1, (size_t)scanline, color);
         }
 
         // background pipeline
