@@ -2,8 +2,10 @@
 
 #include "../../core/Bus.h"
 #include "../../core/Device.h"
+#include "../../core/Helpers.h"
 
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -64,13 +66,19 @@ class NES_CPU : public Device {
         uint8_t read(uint16_t addr, bool readonly = false) override;
         void write(uint16_t addr, uint8_t data) override;
 
-        inline uint8_t getFlag(FLAGS f) { return ((status & f) > 0) ? 1 : 0; }
+        inline uint8_t getFlag(FLAGS f) const { return ((status & f) > 0) ? 1 : 0; }
         inline void setFlag(FLAGS f, bool v) { status = (v ? status |= f : status &= ~f); }
 
-        inline void push(uint8_t data) { write(0x0100 + sp--, data); }
-        inline uint8_t pop() { return read(0x0100 + ++sp); }
+        inline void push(uint8_t data) {
+            write(0x0100 + sp, data);
+            sp--;
+        }
+        inline uint8_t pop() {
+            sp++;
+            return read(0x0100 + sp);
+        }
 
-#pragma region Addressing Modes
+        #pragma region Addressing Modes
         inline uint8_t IMP() {
             fetched = a;
             return 0;
@@ -145,8 +153,87 @@ class NES_CPU : public Device {
             if ((addrAbs & 0xFF00) != (hi << 8)) return 1;
             return 0;
         }
-#pragma endregion
-#pragma region Instructions
+        #pragma endregion
+        #pragma region Instructions
+        #pragma region Access
+        inline uint8_t LDA() {
+            fetch();
+            a = fetched;
+
+            setFlag(Z, a == 0);
+            setFlag(N, a & 0x80);
+
+            return 1;
+        }
+        inline uint8_t STA() {
+            write(addrAbs, a);
+
+            return 0;
+        }
+        inline uint8_t LDX() {
+            fetch();
+            x = fetched;
+
+            setFlag(Z, x == 0);
+            setFlag(N, x & 0x80);
+
+            return 1;
+        }
+        inline uint8_t STX() {
+            write(addrAbs, x);
+
+            return 0;
+        }
+        inline uint8_t LDY() {
+            fetch();
+            y = fetched;
+
+            setFlag(Z, y == 0);
+            setFlag(N, y & 0x80);
+
+            return 1;
+        }
+        inline uint8_t STY() {
+            write(addrAbs, y);
+
+            return 0;
+        }
+        #pragma endregion
+        #pragma region Transfer
+        inline uint8_t TAX() {
+            x = a;
+
+            setFlag(Z, x == 0);
+            setFlag(N, x & 0x80);
+
+            return 0;
+        }
+        inline uint8_t TXA() {
+            a = x;
+
+            setFlag(Z, a == 0);
+            setFlag(N, a & 0x80);
+
+            return 0;
+        }
+        inline uint8_t TAY() {
+            y = a;
+
+            setFlag(Z, y == 0);
+            setFlag(N, y & 0x80);
+
+            return 0;
+        }
+        inline uint8_t TYA() {
+            a = y;
+
+            setFlag(Z, a == 0);
+            setFlag(N, a & 0x80);
+
+            return 0;
+        }
+        #pragma endregion
+        #pragma region Arithmetic
         inline uint8_t ADC() {
             fetch();
 
@@ -162,16 +249,80 @@ class NES_CPU : public Device {
 
             return 1;
         }
-        inline uint8_t AND() {
+        inline uint8_t SBC() {
             fetch();
 
-            a = a & fetched;
+            int16_t t = (int16_t)a + (int16_t)~fetched + (int16_t)getFlag(C);
 
-            setFlag(Z, a == 0);
-            setFlag(N, a & 0x80);
+            setFlag(C, !(t < 0x00));
+            setFlag(Z, (t & 0xFF) == 0);
+            setFlag(V, (t ^ a) & (t ^ ~fetched) & 0x80);
+            setFlag(N, t & 0x80);
+
+            a = t & 0xFF;
 
             return 1;
         }
+        inline uint8_t INC() {
+            fetch();
+
+            uint8_t t = fetched;
+            t++;
+
+            write(addrAbs, t);
+
+            setFlag(Z, t == 0);
+            setFlag(N, t & 0x80);
+
+            return 0;
+        }
+        inline uint8_t DEC() {
+            fetch();
+
+            uint8_t t = fetched;
+            t--;
+
+            write(addrAbs, t);
+
+            setFlag(Z, t == 0);
+            setFlag(N, t & 0x80);
+
+            return 0;
+        }
+        inline uint8_t INX() {
+            x++;
+
+            setFlag(Z, x == 0);
+            setFlag(N, x & 0x80);
+
+            return 0;
+        }
+        inline uint8_t DEX() {
+            x--;
+
+            setFlag(Z, x == 0);
+            setFlag(N, x & 0x80);
+
+            return 0;
+        }
+        inline uint8_t INY() {
+            y++;
+
+            setFlag(Z, y == 0);
+            setFlag(N, y & 0x80);
+
+            return 0;
+        }
+        inline uint8_t DEY() {
+            y--;
+
+            setFlag(Z, y == 0);
+            setFlag(N, y & 0x80);
+
+            return 0;
+        }
+        #pragma endregion
+        #pragma region Shift
         inline uint8_t ASL() {
             fetch();
 
@@ -188,6 +339,134 @@ class NES_CPU : public Device {
 
             return 0;
         }
+        inline uint8_t LSR() {
+            fetch();
+
+            uint16_t t = (uint16_t)fetched >> 1;
+
+            setFlag(C, fetched & 0x01);
+            setFlag(Z, (t & 0xFF) == 0);
+            setFlag(N, t & 0x80);
+
+            if (lookup[opcode].addrmode == &NES_CPU::IMP)
+                a = t & 0xFF;
+            else
+                write(addrAbs, t & 0xFF);
+
+            return 0;
+        }
+        inline uint8_t ROL() {
+            fetch();
+
+            uint8_t t = (fetched << 1) | getFlag(C);
+
+            setFlag(C, fetched & 0x80);
+            setFlag(Z, t == 0);
+            setFlag(N, t & 0x80);
+
+            if (lookup[opcode].addrmode == &NES_CPU::IMP)
+                a = t;
+            else
+                write(addrAbs, t);
+
+            return 0;
+        }
+        inline uint8_t ROR() {
+            fetch();
+
+            uint8_t t = (fetched >> 1) | (getFlag(C) << 7);
+
+            setFlag(C, fetched & 0x01);
+            setFlag(Z, t == 0);
+            setFlag(N, t & 0x80);
+
+            if (lookup[opcode].addrmode == &NES_CPU::IMP)
+                a = t;
+            else
+                write(addrAbs, t);
+
+            return 0;
+        }
+        #pragma endregion
+        #pragma region Bitwise
+        inline uint8_t AND() {
+            fetch();
+
+            a = a & fetched;
+
+            setFlag(Z, a == 0);
+            setFlag(N, a & 0x80);
+
+            return 1;
+        }
+        inline uint8_t ORA() {
+            fetch();
+
+            a = a | fetched;
+
+            setFlag(Z, a == 0);
+            setFlag(N, a & 0x80);
+
+            return 1;
+        }
+        inline uint8_t EOR() {
+            fetch();
+
+            a = a ^ fetched;
+
+            setFlag(Z, a == 0);
+            setFlag(N, a & 0x80);
+
+            return 1;
+        }
+        inline uint8_t BIT() {
+            fetch();
+
+            uint8_t t = a & fetched;
+
+            setFlag(Z, t == 0);
+            setFlag(V, fetched & 0x40);
+            setFlag(N, fetched & 0x80);
+
+            return 0;
+        }
+        #pragma endregion
+        #pragma region Compare
+        inline uint8_t CMP() {
+            fetch();
+
+            uint16_t t = (uint16_t)a - (uint16_t)fetched;
+
+            setFlag(C, a >= fetched);
+            setFlag(Z, (t & 0xFF) == 0);
+            setFlag(N, t & 0x80);
+
+            return 1;
+        }
+        inline uint8_t CPX() {
+            fetch();
+
+            uint16_t t = (uint16_t)x - (uint16_t)fetched;
+
+            setFlag(C, x >= fetched);
+            setFlag(Z, (t & 0xFF) == 0);
+            setFlag(N, t & 0x80);
+
+            return 1;
+        }
+        inline uint8_t CPY() {
+            fetch();
+
+            uint16_t t = (uint16_t)y - (uint16_t)fetched;
+
+            setFlag(C, y >= fetched);
+            setFlag(Z, (t & 0xFF) == 0);
+            setFlag(N, t & 0x80);
+
+            return 1;
+        }
+        #pragma endregion
+        #pragma region Branch
         inline uint8_t BCC() {
             if (getFlag(C) == 0) {
                 cycles++;
@@ -230,31 +509,6 @@ class NES_CPU : public Device {
 
             return 0;
         }
-        inline uint8_t BIT() {
-            fetch();
-
-            uint8_t t = a & fetched;
-
-            setFlag(Z, t == 0);
-            setFlag(V, fetched & 0x40);
-            setFlag(N, fetched & 0x80);
-
-            return 0;
-        }
-        inline uint8_t BMI() {
-            if (getFlag(N) == 1) {
-                cycles++;
-
-                addrAbs = pc + addrRel;
-
-                if ((addrAbs & 0xFF00) != (pc & 0xFF00))
-                    cycles++;
-
-                pc = addrAbs;
-            }
-
-            return 0;
-        }
         inline uint8_t BNE() {
             if (getFlag(Z) == 0) {
                 cycles++;
@@ -283,22 +537,17 @@ class NES_CPU : public Device {
 
             return 0;
         }
-        inline uint8_t BRK() {
-            pc++;
+        inline uint8_t BMI() {
+            if (getFlag(N) == 1) {
+                cycles++;
 
-            setFlag(I, 1);
+                addrAbs = pc + addrRel;
 
-            push((pc >> 8) & 0xFF);
-            push(pc & 0xFF);
+                if ((addrAbs & 0xFF00) != (pc & 0xFF00))
+                    cycles++;
 
-            setFlag(B, 1);
-            push(status);
-            setFlag(B, 0);
-
-            uint16_t lo = read(0xFFFE);
-            uint16_t hi = read(0xFFFF);
-
-            pc = (hi << 8) | lo;
+                pc = addrAbs;
+            }
 
             return 0;
         }
@@ -330,123 +579,8 @@ class NES_CPU : public Device {
 
             return 0;
         }
-        inline uint8_t CLC() {
-            setFlag(C, false);
-            return 0;
-        }
-        inline uint8_t CLD() {
-            setFlag(D, false);
-            return 0;
-        }
-        inline uint8_t CLI() {
-            setFlag(I, false);
-            return 0;
-        }
-        inline uint8_t CLV() {
-            setFlag(V, false);
-            return 0;
-        }
-        inline uint8_t CMP() {
-            fetch();
-
-            uint16_t t = (uint16_t)a - (uint16_t)fetched;
-
-            setFlag(C, a >= fetched);
-            setFlag(Z, (t & 0xFF) == 0);
-            setFlag(N, t & 0x80);
-
-            return 1;
-        }
-        inline uint8_t CPX() {
-            fetch();
-
-            uint16_t t = (uint16_t)x - (uint16_t)fetched;
-
-            setFlag(C, x >= fetched);
-            setFlag(Z, (t & 0xFF) == 0);
-            setFlag(N, t & 0x80);
-
-            return 1;
-        }
-        inline uint8_t CPY() {
-            fetch();
-
-            uint16_t t = (uint16_t)y - (uint16_t)fetched;
-
-            setFlag(C, y >= fetched);
-            setFlag(Z, (t & 0xFF) == 0);
-            setFlag(N, t & 0x80);
-
-            return 1;
-        }
-        inline uint8_t DEC() {
-            fetch();
-
-            uint8_t t = fetched;
-            t--;
-
-            write(addrAbs, t);
-
-            setFlag(Z, t == 0);
-            setFlag(N, t & 0x80);
-
-            return 0;
-        }
-        inline uint8_t DEX() {
-            x--;
-
-            setFlag(Z, x == 0);
-            setFlag(N, x & 0x80);
-
-            return 0;
-        }
-        inline uint8_t DEY() {
-            y--;
-
-            setFlag(Z, y == 0);
-            setFlag(N, y & 0x80);
-
-            return 0;
-        }
-        inline uint8_t EOR() {
-            fetch();
-
-            a = a ^ fetched;
-
-            setFlag(Z, a == 0);
-            setFlag(N, a & 0x80);
-
-            return 1;
-        }
-        inline uint8_t INC() {
-            fetch();
-
-            uint8_t t = fetched;
-            t++;
-
-            write(addrAbs, t);
-
-            setFlag(Z, t == 0);
-            setFlag(N, t & 0x80);
-
-            return 0;
-        }
-        inline uint8_t INX() {
-            x++;
-
-            setFlag(Z, x == 0);
-            setFlag(N, x & 0x80);
-
-            return 0;
-        }
-        inline uint8_t INY() {
-            y++;
-
-            setFlag(Z, y == 0);
-            setFlag(N, y & 0x80);
-
-            return 0;
-        }
+        #pragma endregion
+        #pragma region Jump
         inline uint8_t JMP() {
             pc = addrAbs;
             return 0;
@@ -461,113 +595,31 @@ class NES_CPU : public Device {
 
             return 0;
         }
-        inline uint8_t LDA() {
-            fetch();
-            a = fetched;
+        inline uint8_t RTS() {
+            uint16_t lo = pop();
+            uint16_t hi = pop();
 
-            setFlag(Z, a == 0);
-            setFlag(N, a & 0x80);
-
-            return 1;
-        }
-        inline uint8_t LDX() {
-            fetch();
-            x = fetched;
-
-            setFlag(Z, x == 0);
-            setFlag(N, x & 0x80);
-
-            return 1;
-        }
-        inline uint8_t LDY() {
-            fetch();
-            y = fetched;
-
-            setFlag(Z, y == 0);
-            setFlag(N, y & 0x80);
-
-            return 1;
-        }
-        inline uint8_t LSR() {
-            fetch();
-
-            uint16_t t = (uint16_t)fetched >> 1;
-
-            setFlag(C, fetched & 0x01);
-            setFlag(Z, (t & 0xFF) == 0);
-            setFlag(N, t & 0x80);
-
-            if (lookup[opcode].addrmode == &NES_CPU::IMP)
-                a = t & 0xFF;
-            else
-                write(addrAbs, t & 0xFF);
+            pc = (hi << 8) | lo;
+            pc++;
 
             return 0;
         }
-        inline uint8_t NOP() {
-            return 0;
-        }
-        inline uint8_t ORA() {
-            fetch();
+        inline uint8_t BRK() {
+            pc++;
 
-            a = a | fetched;
+            setFlag(I, 1);
 
-            setFlag(Z, a == 0);
-            setFlag(N, a & 0x80);
+            push((pc >> 8) & 0xFF);
+            push(pc & 0xFF);
 
-            return 1;
-        }
-        inline uint8_t PHA() {
-            push(a);
-            return 0;
-        }
-        inline uint8_t PHP() {
-            push(status | 0x10);
-            return 0;
-        }
-        inline uint8_t PLA() {
-            a = pop();
+            setFlag(B, 1);
+            push(status);
+            setFlag(B, 0);
 
-            setFlag(Z, a == 0);
-            setFlag(N, a & 0x80);
+            uint16_t lo = read(0xFFFE);
+            uint16_t hi = read(0xFFFF);
 
-            return 0;
-        }
-        inline uint8_t PLP() {
-            status = pop();
-            status &= ~B;
-            status |= U;
-            return 0;
-        }
-        inline uint8_t ROL() {
-            fetch();
-
-            uint8_t t = (fetched << 1) | getFlag(C);
-
-            setFlag(C, fetched & 0x80);
-            setFlag(Z, t == 0);
-            setFlag(N, t & 0x80);
-
-            if (lookup[opcode].addrmode == &NES_CPU::IMP)
-                a = t;
-            else
-                write(addrAbs, t);
-
-            return 0;
-        }
-        inline uint8_t ROR() {
-            fetch();
-
-            uint8_t t = (fetched >> 1) | (getFlag(C) << 7);
-
-            setFlag(C, fetched & 0x01);
-            setFlag(Z, t == 0);
-            setFlag(N, t & 0x80);
-
-            if (lookup[opcode].addrmode == &NES_CPU::IMP)
-                a = t;
-            else
-                write(addrAbs, t);
+            pc = (hi << 8) | lo;
 
             return 0;
         }
@@ -581,69 +633,32 @@ class NES_CPU : public Device {
 
             return 0;
         }
-        inline uint8_t RTS() {
-            uint16_t lo = pop();
-            uint16_t hi = pop();
+        #pragma endregion
+        #pragma region Stack
+        inline uint8_t PHA() {
+            push(a);
+            return 0;
+        }
+        inline uint8_t PLA() {
+            a = pop();
 
-            pc = (hi << 8) | lo;
-            pc++;
+            setFlag(Z, a == 0);
+            setFlag(N, a & 0x80);
 
             return 0;
         }
-        inline uint8_t SBC() {
-            fetch();
-
-            int16_t t = (int16_t)a + (int16_t)~fetched + (int16_t)getFlag(C);
-
-            setFlag(C, !(t < 0x00));
-            setFlag(Z, (t & 0xFF) == 0);
-            setFlag(V, (t ^ a) & (t ^ ~fetched) & 0x80);
-            setFlag(N, t & 0x80);
-
-            a = t & 0xFF;
-
-            return 1;
-        }
-        inline uint8_t SEC() {
-            setFlag(C, true);
+        inline uint8_t PHP() {
+            push(status | 0x10);
             return 0;
         }
-        inline uint8_t SED() {
-            setFlag(D, true);
+        inline uint8_t PLP() {
+            status = pop();
+            status &= ~B;
+            status |= U;
             return 0;
         }
-        inline uint8_t SEI() {
-            setFlag(I, true);
-            return 0;
-        }
-        inline uint8_t STA() {
-            write(addrAbs, a);
-
-            return 0;
-        }
-        inline uint8_t STX() {
-            write(addrAbs, x);
-
-            return 0;
-        }
-        inline uint8_t STY() {
-            write(addrAbs, y);
-
-            return 0;
-        }
-        inline uint8_t TAX() {
-            x = a;
-
-            setFlag(Z, x == 0);
-            setFlag(N, x & 0x80);
-
-            return 0;
-        }
-        inline uint8_t TAY() {
-            y = a;
-
-            setFlag(Z, y == 0);
-            setFlag(N, y & 0x80);
+        inline uint8_t TXS() {
+            sp = x;
 
             return 0;
         }
@@ -655,37 +670,53 @@ class NES_CPU : public Device {
 
             return 0;
         }
-        inline uint8_t TXA() {
-            a = x;
-
-            setFlag(Z, a == 0);
-            setFlag(N, a & 0x80);
-
+        #pragma endregion
+        #pragma region Flags
+        inline uint8_t CLC() {
+            setFlag(C, false);
             return 0;
         }
-        inline uint8_t TXS() {
-            sp = x;
-
+        inline uint8_t SEC() {
+            setFlag(C, true);
             return 0;
         }
-        inline uint8_t TYA() {
-            a = y;
-
-            setFlag(Z, a == 0);
-            setFlag(N, a & 0x80);
-
+        inline uint8_t CLI() {
+            setFlag(I, false);
             return 0;
         }
-
+        inline uint8_t SEI() {
+            setFlag(I, true);
+            return 0;
+        }
+        inline uint8_t CLD() {
+            setFlag(D, false);
+            return 0;
+        }
+        inline uint8_t SED() {
+            setFlag(D, true);
+            return 0;
+        }
+        inline uint8_t CLV() {
+            setFlag(V, false);
+            return 0;
+        }
+        #pragma endregion
+        #pragma region Other
+        inline uint8_t NOP() {
+            return 0;
+        }
+        #pragma endregion
         inline uint8_t XXX() {
-            return 0;
+            std::string msg = "ILLEGAL OPCODE ATTEMPTED: " + hex(opcode, 2);
+            throw std::exception(msg.c_str());
         }
 #pragma endregion
-#pragma region Debugging
+        #pragma region Debugging
         std::ofstream* traceStream = nullptr;
+        std::stringstream ss;
 
         std::string disassembleInst(uint16_t addr);
-        std::string formatInst();
+        std::string formatInst() const;
         std::string trace();
-#pragma endregion
+        #pragma endregion
 };

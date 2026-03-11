@@ -42,7 +42,8 @@ bool NES::loadCartridge(const std::string& path) {
 
 void NES::reset() {
     cpu->reset();
-    // reset ppu
+    ppu->reset();
+    // reset apu
 }
 
 void NES::clock() {
@@ -52,24 +53,17 @@ void NES::clock() {
         if (systemClockCounter % 3 == 0)
             cpu.get()->clock();
 
-        if (ppu.get()->nmi) {
-            printf("requesting NMI execution from CPU...\n");
+        if (ppu.get()->isInVblank() && ppu.get()->nmiRequested) {
             cpu.get()->NMI();
-            ppu->nmi = false;
+            ppu->nmiRequested = false;
         }
 
         systemClockCounter++;
     } while (!ppu->frameComplete);
 
     ppu->frameComplete = false;
-
-    updateFrameBuffer();
 }
 
 const uint32_t* NES::getFrameBuffer() const {
-    return frameBuffer;
-}
-
-void NES::updateFrameBuffer() {
-    frameBuffer = ppu->getFrameBuffer();
+    return ppu->getFrameBuffer();
 }

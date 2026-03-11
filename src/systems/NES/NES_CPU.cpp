@@ -69,8 +69,6 @@ void NES_CPU::reset() {
 
     pc = (hi << 8) | lo;
 
-    pc = 0xC000;
-
     addrRel = 0;
     addrAbs = 0;
     fetched = 0;
@@ -159,7 +157,7 @@ std::string NES_CPU::disassembleInst(uint16_t addr) {
     return sInst;
 }
 
-std::string NES_CPU::formatInst() {
+std::string NES_CPU::formatInst() const {
     std::stringstream ss;
 
     ss << "A:" << hex(a, 2) << " ";
@@ -230,14 +228,13 @@ void NES_CPU::IRQ() {
 }
 
 void NES_CPU::NMI() {
-    write(0x0100 + sp--, (pc >> 8) & 0x00FF);
-    write(0x0100 + sp--, pc & 0x00FF);
-    setFlag(B, 0);
-    setFlag(U, 1);
-    setFlag(I, 1);
-    write(0x0100 + sp--, status);
+    push((pc & 0xFF00) >> 8);
+    push(pc & 0x00FF);
+    push(status);
+    setFlag(I, true);
     uint16_t lo = read(0xFFFA);
     uint16_t hi = read(0xFFFB);
-    pc = (hi << 8) | lo;
-    cycles = 8;
+    uint16_t addr = (hi << 8) | lo;
+    pc = addr;
+    cycles += 7;
 }

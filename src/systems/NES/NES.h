@@ -33,7 +33,4 @@ class NES : public IConsole {
         std::unique_ptr<NES_PPU> ppu;
         uint64_t systemClockCounter = 0;
         std::ofstream traceFile;
-        const uint32_t* frameBuffer;
-
-        void updateFrameBuffer();
 };

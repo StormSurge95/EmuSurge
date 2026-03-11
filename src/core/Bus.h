@@ -22,10 +22,6 @@ class Bus {
         inline uint8_t read(uint16_t addr, bool readonly = false) {
             for (Mapping &m : mappings) {
                 if (addr >= m.start && addr <= m.end) {
-                    //if (m.devName == "CPU") printf("CPU read %04X\n", addr);
-                    //else if (m.devName == "CPU RAM") printf("CPU RAM read %04X\n", addr);
-                    //else if (m.devName == "PPU") printf("PPU read %04X\n", addr);
-                    //if (m.devName == "CART") printf("CART read %04X\n", addr);
                     return m.device->read(addr);
                 }
             }
@@ -35,9 +31,6 @@ class Bus {
         inline void write(uint16_t addr, uint8_t data) {
             for (Mapping &m : mappings) {
                 if (addr >= m.start && addr <= m.end) {
-                    //if (m.devName == "CPU") printf("CPU write %04X = %02X\n", addr, data);
-                    //else if (m.devName == "CPU RAM") printf("CPU RAM write %04X = %02X\n", addr, data);
-                    //else if (m.devName == "PPU") printf("PPU write %04X = %02X\n", addr, data);
                     m.device->write(addr, data);
                     return;
                 }
