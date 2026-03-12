@@ -5,24 +5,85 @@ NES_PPU::NES_PPU() {}
 NES_PPU::~NES_PPU() {}
 
 void NES_PPU::clock() {
-    if (scanline == -1)
-        onPreLine();
-    else if (scanline < 240)
-        onVisibleLine();
-    else if (scanline == 241)
-        onVBlankLine();
+    bool rendering = PPUMASK.enableBackground || PPUMASK.enableSprites;
 
+    // VISIBLE PIXEL OUTPUT
+    if (scanline >= 0 && scanline < 240 && cycle >= 1 && cycle <= 256) {
+        renderPixel();
+    }
+
+    // BACKGROUND SHIFT REGISTERS
+    if (((cycle >= 2 && cycle <= 257) || (cycle >= 322 && cycle <= 337)))
+        shiftBackground();
+
+    // BACKGROUND TILE FETCH PIPELINE
+    if (rendering && (scanline <= 239 || scanline == 261) && ((cycle >= 1 && cycle <= 256) || (cycle >= 321 && cycle <= 336))) {
+        switch (cycle % 8) {
+            case 1:
+                loadBackgroundShifters();
+                fetchNametableByte();
+                break;
+            case 3:
+                fetchAttributeByte();
+                break;
+            case 5:
+                fetchPatternLow();
+                break;
+            case 7:
+                fetchPatternHigh();
+                break;
+            case 0:
+                incrementX();
+                break;
+            default:
+                break;
+        }
+    }
+
+    // SCROLL UPDATES
+    if (rendering) {
+        if (cycle == 256)
+            incrementY();
+        else if (cycle == 257)
+            copyHorizontalBits();
+        else if (scanline == 261 && cycle >= 280 && cycle <= 304)
+            copyVerticalBits();
+    }
+
+    // VBLANK AND PRE-RENDER EVENTS
+    if (scanline == 241 && cycle == 1) {
+        PPUSTATUS.isInVblank = true;
+
+        if (PPUCTRL.nmi_enabled)
+            triggerNMI();
+    }
+    if (scanline == 261 && cycle == 1) {
+        PPUSTATUS.isInVblank = false;
+        PPUSTATUS.spriteZeroHit = false;
+        PPUSTATUS.spriteOverflow = false;
+    }
+
+    // CYCLE AND SCANLINE ADVANCE
     cycle++;
+
     if (cycle >= 341) {
         cycle = 0;
         scanline++;
-        if (scanline >= 261) {
-            scanline = -1;
-            frame++;
-            frameComplete = true;
-            ntbase = nametableBaseAddr();
-            bptbase = bgPatternTblBaseAddr();
+
+        if (scanline >= 262) {
+            scanline = 0;
+            frameComplete = false;
+
+            oddFrame = !oddFrame;
         }
+    }
+
+    // ODD-FRAME CYCLE-SKIP
+    if (rendering && oddFrame && scanline == 261 && cycle == 339) {
+        cycle = 0;
+        scanline = 0;
+        frameComplete = true;
+        oddFrame = false;
     }
 }
 
@@ -37,7 +98,8 @@ uint8_t NES_PPU::read(uint16_t addr, bool readonly) {
                 if (!readonly) w = false;
                 return PPUSTATUS.value();
             case 0x04: // OAMDATA
-                return OAMDATA;
+                if (readonly) return OAMDATA;
+                return primaryOAM[OAMADDR];
             case 0x07: // PPUDATA
                 return PPUDATA;
         }
@@ -62,26 +124,58 @@ void NES_PPU::write(uint16_t addr, uint8_t data) {
                 break;
             case 0x04: // OAMDATA
                 OAMDATA = data;
+                primaryOAM[OAMADDR] = OAMDATA;
+                OAMADDR++;
                 break;
             case 0x05: // PPUSCROLL
                 PPUSCROLL = data;
-                w = !w;
+                if (!w) {
+                    // first write; horizontal scroll (coarse x)
+                    fine_x = data & 0x07;
+
+                    t &= ~0x001F;
+                    t |= (data >> 3) & 0x1F;
+
+                    w = true;
+                } else {
+                    // second write; vertical scroll (coarse y)
+                    t &= 0x73E0;
+
+                    t |= (data & 0x07) << 12;
+                    t |= (data & 0xF8) << 2;
+
+                    w = false;
+                }
                 break;
             case 0x06: // PPUADDR
                 if (!w) {
-                    vramAddr = (data << 8) | (vramAddr & 0x00FF);
+                    //vramAddr = (data << 8) | (vramAddr & 0x00FF);
+                    // first write; high byte of address
+                    t &= 0x00FF;
+                    t |= (data & 0x3F) << 8;
+
                     w = true;
                 } else {
-                    vramAddr = (vramAddr & 0xFF00) | data;
+                    //vramAddr = (vramAddr & 0xFF00) | data;
+                    // second write; low byte of address
+                    t &= 0x7F00;
+                    t |= data;
+
+                    v = t; // transfer address from t to v
+
                     w = false;
                 }
                 break;
             case 0x07: // PPU DATA
-                ppuWrite(vramAddr, data);
-                if (PPUCTRL.incrementBy32)
-                    vramAddr += 32;
-                else
-                    vramAddr += 1;
+                //ppuWrite(vramAddr, data);
+                ppuWrite(v, data);
+                if (PPUCTRL.incrementBy32) {
+                    //vramAddr += 32;
+                    v += 32;
+                } else {
+                    //vramAddr += 1;
+                    v++;
+                }
                 break;
         }
     }
@@ -159,119 +253,33 @@ const uint32_t* NES_PPU::getFrameBuffer() const {
     return frameBuffer.data();
 }
 
-void NES_PPU::plot(uint16_t x, uint16_t y, uint32_t color) {
-    frameBuffer[(size_t)y * 256 + (size_t)x] = color;
+void NES_PPU::evaluateSprites() {
 }
 
-void NES_PPU::onPreLine() {
-    if (cycle == 1) {
-        PPUSTATUS.isInVblank = false;
+void NES_PPU::renderPixel() {
+    uint16_t mux = 0x8000 >> fine_x;
+
+    uint8_t p0 = (pattShiftLo & mux) > 0;
+    uint8_t p1 = (pattShiftHi & mux) > 0;
+
+    uint8_t pixel = (p1 << 1) | p0;
+
+    uint8_t a0 = (attrShiftLo & mux) > 0;
+    uint8_t a1 = (attrShiftHi & mux) > 0;
+
+    uint8_t attr = (a1 << 1) | a0;
+
+    if (!PPUMASK.enableBackground) {
+        pixel = 0;
+        attr = 0;
     }
-}
 
-void NES_PPU::onVisibleLine() {
-    if (cycle == 256) renderScanline();
-}
+    uint16_t paletteAddr = 0x3F00;
 
-void NES_PPU::onVBlankLine() {
-    if (cycle == 1) {
-        PPUSTATUS.isInVblank = true;
-        if (PPUCTRL.nmi_enabled) {
-            nmiRequested = true;
-        }
-    }
-}
+    if (pixel != 0) paletteAddr += (attr << 2) + pixel;
 
-void NES_PPU::renderScanline() {
-    uint16_t y = scanline;
-    for (uint16_t x = 0; x < 256; x += 8) {
-        uint16_t tileX = x / 8;
-        tileX %= 32;
-        uint16_t tileY = y / 8;
-        tileY %= 30;
-        uint8_t tileID = getTileID(tileX, tileY);
+    uint8_t index = 0;
+    ppuRead(paletteAddr, index);
 
-        for (uint8_t xx = 0; xx < 8; xx++) {
-            uint8_t pixel = getPixel(tileID, y % 8, xx);
-            uint8_t attr = getAttr(tileX, tileY);
-            uint8_t tilePalette = attr * 4 + pixel;
-            if (pixel == 0) tilePalette = 0;
-            uint8_t color = 0;
-            ppuRead(0x3F00 + tilePalette, color);
-            uint16_t trueX = x + xx;
-            plot(trueX, y, masterPalette[color]);
-        }
-    }
-}
-
-uint8_t NES_PPU::getTileID(uint16_t x, uint16_t y) {
-    uint16_t addr = ntbase + (y * 32) + x;
-    uint8_t id = 0;
-    ppuRead(addr, id);
-    return id;
-}
-
-uint8_t NES_PPU::getPixel(uint8_t id, uint8_t row, uint8_t x) {
-    uint16_t pAddr = bptbase + (uint16_t)id * 16 + row;
-
-    uint8_t p0, p1;
-    ppuRead(pAddr, p0);
-    ppuRead(pAddr + 8, p1);
-
-    int bit = 7 - x;
-
-    return ((p0 >> bit) & 1) | (((p1 >> bit) & 1) << 1);
-}
-
-uint8_t NES_PPU::getAttr(uint16_t x, uint16_t y) {
-    uint16_t attrAddr = ntbase + 0x03C0 + (y / 4) * 8 + (x / 4);
-    uint8_t attr;
-    ppuRead(attrAddr, attr);
-    uint8_t shift = ((y % 4) / 2) * 4 +
-        ((x % 4) / 2) * 2;
-
-    return (attr >> shift) & 0x03;
-}
-
-void NES_PPU::renderPatternTable(uint16_t table, uint16_t screenX, uint16_t screenY) {
-    uint16_t base = table * 0x1000;
-
-    for (uint16_t tileY = 0; tileY < 16; tileY++) {
-        for (uint16_t tileX = 0; tileX < 16; tileX++) {
-            uint16_t tileIndex = tileY * 16 + tileX;
-            uint16_t tileAddr = base + tileIndex * 16;
-
-            for (uint8_t row = 0; row < 8; row++) {
-                uint8_t plane0, plane1;
-                ppuRead(tileAddr + row, plane0);
-                ppuRead(tileAddr + row + 8, plane1);
-
-                for (uint8_t col = 0; col < 8; col++) {
-                    uint8_t bit = 7 - col;
-
-                    uint8_t pixel = ((plane0 >> bit) & 1) | (((plane1 >> bit) & 1) << 1);
-                    uint16_t attrAddr = base + 0x23C0 + (screenY / 4) * 8 + (screenX / 4);
-                    uint8_t attrB;
-                    ppuRead(attrAddr, attrB);
-                    uint8_t shift = ((screenY % 4) / 2) * 4 + ((screenX % 4) / 2) * 2;
-                    uint8_t attr = (attrB >> shift) & 0x03;
-                    uint8_t pIndex = attr * 4 + pixel;
-                    if (pixel == 0) pIndex = 0;
-                    uint8_t paletteColor;
-                    ppuRead(0x3F00 + pIndex, paletteColor);
-                    uint32_t rgb = masterPalette[paletteColor];
-
-                    uint32_t debugPalette[4] = {
-                        0x00000000, 0xFF555555,
-                        0xFFAAAAAA, 0xFFFFFFFF
-                    };
-
-                    plot(screenX + tileX * 8 + col,
-                         screenY + tileY * 8 + row,
-                         rgb
-                    );
-                }
-            }
-        }
-    }
+    frameBuffer[(size_t)scanline * 256 + ((size_t)cycle - 1)] = masterPalette[index & 0x3F];
 }

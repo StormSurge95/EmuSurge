@@ -28,16 +28,17 @@ class NES_PPU : public Device {
 
     private:
         Cartridge* cart = nullptr;
+        bool oddFrame = false;
 
         // CPU visible registers
         struct CONTROL {
-            uint8_t nametableBase = 0;
-            bool incrementBy32 = false;
-            bool spritePatternBase2 = false;
-            bool backgroundPatternBase2 = false;
-            bool spritesAre8x16 = false;
-            const bool masterSlave = false;
-            bool nmi_enabled = false;
+            uint8_t nametableBase = 0;              // bits 0-1
+            bool incrementBy32 = false;             // bit 2
+            bool spritePatternBase2 = false;        // bit 3
+            bool backgroundPatternBase2 = false;    // bit 4
+            bool spritesAre8x16 = false;            // bit 5
+            const bool masterSlave = false;         // bit 6
+            bool nmi_enabled = false;               // bit 7
 
             CONTROL& operator=(uint8_t val) {
                 nametableBase = (uint8_t)(val & 0x03);
@@ -129,7 +130,7 @@ class NES_PPU : public Device {
         uint16_t vramAddr = 0;
         uint16_t v = 0; // scroll position/current VRAM address
         uint16_t t = 0; // START scroll position/next VRAM address
-        uint8_t x = 0;  // fine-x position of current scroll
+        uint8_t fine_x = 0;  // fine-x position of current scroll
 
         std::array<uint8_t, 2048> nametables{ 0 };
         std::array<uint32_t, 32> paletteRam{ 0 };
@@ -167,19 +168,127 @@ class NES_PPU : public Device {
                 return 0x0000;
         }
 
-        void renderScanline();
-        void plot(uint16_t x, uint16_t y, uint32_t color);
-
-        void onPreLine();
-        void onVisibleLine();
-        void onVBlankLine();
-
-        uint8_t getTileID(uint16_t x, uint16_t y);
-        uint8_t getPixel(uint8_t id, uint8_t row, uint8_t x);
-        uint8_t getAttr(uint16_t x, uint16_t y);
-
-        void renderPatternTable(uint16_t table, uint16_t screenX, uint16_t screenY);
+        uint16_t val = 0x03C0;
 
         uint16_t ntbase = 0;
         uint16_t bptbase = 0;
+
+
+        inline void triggerNMI() { nmiRequested = true; }
+
+        // tile latches
+        uint8_t nextNametableByte = 0x00;
+        uint8_t nextAttributeByte = 0x00;
+        uint8_t nextPatternLowByte = 0x00;
+        uint8_t nextPatternHighByte = 0x00;
+
+        // background shift registers
+        uint16_t pattShiftLo = 0x0000;
+        uint16_t pattShiftHi = 0x0000;
+        uint16_t attrShiftLo = 0x0000;
+        uint16_t attrShiftHi = 0x0000;
+
+        uint8_t coarseX() const {
+            return v & 0x1F;
+        }
+        uint8_t coarseY() const {
+            return (v >> 5) & 0x1F;
+        }
+        uint8_t fineY() const {
+            return (v >> 12) & 0x07;
+        }
+
+        inline void shiftBackground() {
+            if (PPUMASK.enableBackground) {
+                pattShiftLo <<= 1;
+                pattShiftHi <<= 1;
+
+                attrShiftLo <<= 1;
+                attrShiftHi <<= 1;
+            }
+        }
+        inline void loadBackgroundShifters() {
+            pattShiftLo = (pattShiftLo & 0xFF00) | nextPatternLowByte;
+            pattShiftHi = (pattShiftHi & 0xFF00) | nextPatternHighByte;
+
+            attrShiftLo = (attrShiftLo & 0xFF00) | ((nextAttributeByte & 0b01) ? 0xFF : 0x00);
+            attrShiftHi = (attrShiftHi & 0xFF00) | ((nextAttributeByte & 0b10) ? 0xFF : 0x00);
+        }
+        inline void fetchNametableByte() {
+            uint16_t addr = nametableBaseAddr() | (v & 0x0FFF);
+            ppuRead(addr, nextNametableByte);
+        }
+        inline void fetchAttributeByte() {
+            uint16_t addr = (nametableBaseAddr() + 0x03C0) |
+                (v & 0x0C00) |
+                ((coarseY() >> 2) << 3) |
+                (coarseX() >> 2);
+            ppuRead(addr, nextAttributeByte);
+
+            if (coarseY() & 0x02) nextAttributeByte >>= 4;
+            if (coarseX() & 0x02) nextAttributeByte >>= 2;
+
+            nextAttributeByte &= 0x03;
+        }
+        inline void fetchPatternLow() {
+            uint16_t addr = bgPatternTblBaseAddr() |
+                (nextNametableByte << 4) |
+                fineY();
+            ppuRead(addr, nextPatternLowByte);
+        }
+        inline void fetchPatternHigh() {
+            uint16_t addr = bgPatternTblBaseAddr() |
+                (nextNametableByte << 4) |
+                fineY();
+            ppuRead(addr + 8, nextPatternHighByte);
+        }
+        inline void incrementX() {
+            if ((v & 0x001F) == 31) {
+                v &= ~0x001F;
+                v ^= 0x0400;
+            } else {
+                v++;
+            }
+        }
+        inline void incrementY() {
+            if ((v & 0x7000) != 0x7000) {
+                v += 0x1000;
+            } else {
+                v &= ~0x7000;
+                int8_t y = (v & 0x03E0) >> 5;
+                if (y == 29) {
+                    y = 0;
+                    v ^= 0x0800;
+                } else if (y == 31) {
+                    y = 0;
+                } else {
+                    y++;
+                }
+                v = (v & ~0x03E0) | (y << 5);
+            }
+        }
+        inline void copyHorizontalBits() { v = (v & ~0x041F) | (t & 0x041F); }
+        inline void copyVerticalBits() { v = (v & ~0x73E0) | (t & 0x73E0); }
+        void renderPixel();
+
+        struct SPRITE {
+            uint8_t yCoord = 0x00;
+            uint8_t tileIndex = 0x00;
+            struct ATTR {
+                bool verticalFlip = false;
+                bool horizontalFlip = false;
+                bool priority = true;
+                uint8_t palette = 0x00;
+
+                ATTR& operator=(uint8_t b) {
+                    verticalFlip = !!(b & 0b10000000);
+                    horizontalFlip = !!(b & 0b01000000);
+                    priority = !(b & 0b00100000);
+                    palette = (b & 0x00001100) >> 2;
+                }
+            } attr{};
+            uint8_t xCoord = 0x00;
+        };
+        uint8_t primaryOAM[256]{ 0 };
+        void evaluateSprites();
 };
