@@ -26,128 +26,103 @@ class NES_PPU : public Device {
         const uint32_t* getFrameBuffer() const;
         inline void connectCartridge(Cartridge* cartridge) { cart = cartridge; }
 
-        #pragma region PPUSTATUS READ/WRITE
-        inline bool isInVblank() const { return !!(PPUSTATUS & 0x80); }
-        inline void isInVblank(bool set) {
-            if (set) PPUSTATUS |= 0x80;
-            else PPUSTATUS &= ~0x80;
-        }
-        inline bool isSprite0Hit() const { return !!(PPUSTATUS & 0x40); }
-        inline void isSprite0Hit(bool set) {
-            if (set) PPUSTATUS |= 0x40;
-            else PPUSTATUS &= ~0x40;
-        }
-        inline bool isSpriteOverflow() const { return !!((PPUSTATUS & 0x20)); }
-        inline void isSpriteOverflow(bool set) {
-            if (set) PPUSTATUS |= 0x20;
-            else PPUSTATUS &= ~0x20;
-        }
-        #pragma endregion
-        #pragma region PPUCTRL READ/WRITE
-        inline bool nmiEnabled() const { return !!(PPUCTRL & 0x80); }
-        inline void nmiEnabled(bool set) {
-            if (set) PPUCTRL |= 0x80;
-            else PPUCTRL &= ~0x80;
-        }
-        inline bool isSprite8x16() const { return !!(PPUCTRL & 0x20); }
-        inline bool isSprite8x16(bool set) {
-            if (set) PPUCTRL |= 0x20;
-            else PPUCTRL &= ~0x20;
-        }
-        inline uint16_t bgPatternTblBaseAddr() const {
-            if (PPUCTRL & 0x10) return 0x1000;
-            return 0x0000;
-        }
-        inline void bgPatterlTblBaseAddr(bool set) {
-            if (set) PPUCTRL |= 0x10;
-            else PPUCTRL &= ~0x10;
-        }
-        inline uint16_t spritePatternTblBaseAddr() const {
-            if (PPUCTRL & 0x08) return 0x1000;
-            return 0x0000;
-        }
-        inline void spritePatternTblBaseAddr(bool set) {
-            if (set) PPUCTRL |= 0x08;
-            else PPUCTRL &= ~0x08;
-        }
-        inline uint8_t incrementMode() const {
-            if (PPUCTRL & 0x04) return 32;
-            else return 1;
-        }
-        inline void incrementMode(bool set) {
-            if (set) PPUCTRL |= 0x04;
-            else PPUCTRL &= ~0x04;
-        }
-        inline uint16_t nametableBaseAddr() const {
-            uint16_t o = (PPUCTRL & 0x03) * 0x0400;
-            return 0x2000 + o;
-        }
-        inline void nametableBaseAddr(uint8_t set) {
-            PPUCTRL |= (set & 0x03);
-        }
-        #pragma endregion
-        #pragma region PPUMASK READ/WRITE
-        inline bool focusBlue() const { return !!(PPUMASK & 0x80); }
-        inline void focusBlue(bool set) {
-            if (set) PPUMASK |= 0x80;
-            else PPUMASK &= ~0x80;
-        }
-        inline bool focusGreen() const { return !!(PPUMASK & 0x40); }
-        inline void focusGreen(bool set) {
-            if (set) PPUMASK |= 0x40;
-            else PPUMASK &= ~0x40;
-        }
-        inline bool focusRed() const { return !!(PPUMASK & 0x20); }
-        inline void focusRed(bool set) {
-            if (set) PPUMASK |= 0x20;
-            else PPUMASK &= ~0x20;
-        }
-        inline bool enableSprites() const { return !!(PPUMASK & 0x10); }
-        inline void enableSprites(bool set) {
-            if (set) PPUMASK |= 0x10;
-            else PPUMASK &= ~0x10;
-        }
-        inline bool enableBackground() const { return !!(PPUMASK & 0x08); }
-        inline void enableBackground(bool set) {
-            if (set) PPUMASK |= 0x08;
-            else PPUMASK &= ~0x08;
-        }
-        inline bool enableLeftColumnSprites() const { return !!(PPUMASK & 0x04); }
-        inline void enableLeftColumnSprites(bool set) {
-            if (set) PPUMASK |= 0x04;
-            else PPUMASK &= ~0x04;
-        }
-        inline bool enableLeftColumnBackground() const { return !!(PPUMASK & 0x02); }
-        inline void enableLeftColumnBackground(bool set) {
-            if (set) PPUMASK |= 0x02;
-            else PPUMASK &= ~0x02;
-        }
-        inline bool greyscaleEnabled() const { return !!(PPUMASK & 0x01); }
-        inline void greyscaleEnabled(bool set) {
-            if (set) PPUMASK |= 0x01;
-            else PPUMASK &= ~0x01;
-        }
-        #pragma endregion
-
     private:
         Cartridge* cart = nullptr;
 
         // CPU visible registers
-        uint8_t PPUCTRL = 0;
-        uint8_t PPUMASK = 0;
-        uint8_t PPUSTATUS = 0;
-        uint8_t OAMADDR = 0;
-        uint8_t OAMDATA = 0;
-        uint16_t PPUSCROLL = 0;
-        uint16_t PPUADDR = 0;
-        uint8_t PPUDATA = 0;
-        uint8_t OAMDMA = 0;
+        struct CONTROL {
+            uint8_t nametableBase = 0;
+            bool incrementBy32 = false;
+            bool spritePatternBase2 = false;
+            bool backgroundPatternBase2 = false;
+            bool spritesAre8x16 = false;
+            const bool masterSlave = false;
+            bool nmi_enabled = false;
 
-        unsigned int cycle = 0;
-        int scanline = -1;
-        uint32_t frame = 0;
+            CONTROL& operator=(uint8_t val) {
+                nametableBase = (uint8_t)(val & 0x03);
+                incrementBy32 = !!(val & (1 << 2));
+                spritePatternBase2 = !!(val & (1 << 3));
+                backgroundPatternBase2 = !!(val & (1 << 4));
+                spritesAre8x16 = !!(val & (1 << 5));
+                nmi_enabled = !!(val & (1 << 7));
+                return *this;
+            }
 
-        std::array<uint32_t, 256 * 240> frameBuffer;
+            uint8_t value() const {
+                return (
+                    (+nmi_enabled << 7) |
+                    (+spritesAre8x16 << 5) |
+                    (+backgroundPatternBase2 << 4) |
+                    (+spritePatternBase2 << 3) |
+                    (+incrementBy32 << 2) |
+                    nametableBase);
+            }
+        } PPUCTRL;
+        struct MASK {
+            bool greyscaleMode = false;
+            bool enableBackgroundLeft = false;
+            bool enableSpritesLeft = false;
+            bool enableBackground = false;
+            bool enableSprites = false;
+            bool emphasizeRed = false;
+            bool emphasizeGreen = false;
+            bool emphasizeBlue = false;
+
+            MASK& operator=(uint8_t val) {
+                greyscaleMode = !!(val & (1 << 0));
+                enableBackgroundLeft = !!(val & (1 << 1));
+                enableSpritesLeft = !!(val & (1 << 2));
+                enableBackground = !!(val & (1 << 3));
+                enableSprites = !!(val & (1 << 4));
+                emphasizeRed = !!(val & (1 << 5));
+                emphasizeGreen = !!(val & (1 << 6));
+                emphasizeBlue = !!(val & (1 << 7));
+                return *this;
+            }
+
+            uint8_t value() const {
+                return (
+                    (+emphasizeBlue << 7) |
+                    (+emphasizeGreen << 6) |
+                    (+emphasizeRed << 5) |
+                    (+enableSprites << 4) |
+                    (+enableBackground << 3) |
+                    (+enableSpritesLeft << 2) |
+                    (+enableBackgroundLeft << 1) |
+                    (+greyscaleMode));
+            }
+        } PPUMASK;
+        struct STATUS {
+            bool spriteOverflow = false;
+            bool spriteZeroHit = false;
+            bool isInVblank = false;
+
+            STATUS& operator=(uint8_t val) {
+                spriteOverflow = !!(val & (1 << 5));
+                spriteZeroHit = !!(val & (1 << 6));
+                isInVblank = !!(val & (1 << 7));
+            }
+
+            uint8_t value() const {
+                return (
+                    (+isInVblank << 7) |
+                    (+spriteZeroHit << 6) |
+                    (+spriteOverflow << 5));
+            }
+        } PPUSTATUS;
+        uint8_t OAMADDR = 0x00;
+        uint8_t OAMDATA = 0x00;
+        uint8_t PPUSCROLL = 0x00;
+        uint8_t PPUADDR = 0x00;
+        uint8_t PPUDATA = 0x00;
+        uint8_t OAMDMA = 0x00;
+
+        uint16_t cycle = 0x0000;
+        uint16_t scanline = 0x0000;
+        uint64_t frame = 0x0000000000000000;
+
+        std::array<uint32_t, 256 * 240> frameBuffer{ 0 };
 
         // scroll variables
         bool w = false; // write latch
@@ -156,8 +131,8 @@ class NES_PPU : public Device {
         uint16_t t = 0; // START scroll position/next VRAM address
         uint8_t x = 0;  // fine-x position of current scroll
 
-        std::array<uint8_t, 2048> nametables;
-        std::array<uint32_t, 32> paletteRam = { 0 };
+        std::array<uint8_t, 2048> nametables{ 0 };
+        std::array<uint32_t, 32> paletteRam{ 0 };
         std::array<uint32_t, 64> masterPalette = {
             0xFF666666,0xFF002A88,0xFF1412A7,0xFF3B00A4,0xFF5C007E,0xFF6E0040,0xFF6C0600,0xFF561D00,
             0xFF333500,0xFF0B4800,0xFF005200,0xFF004F08,0xFF00404D,0xFF000000,0xFF000000,0xFF000000,
@@ -169,6 +144,29 @@ class NES_PPU : public Device {
             0xFFE4E594,0xFFCFEF96,0xFFBDF4AB,0xFFB3F3CC,0xFFB5EBF2,0xFFB8B8B8,0xFF000000,0xFF000000
         };
 
+        uint16_t nametableBaseAddr() const {
+            if (PPUCTRL.nametableBase == 0x00)
+                return 0x2000;
+            else if (PPUCTRL.nametableBase == 0x01)
+                return 0x2400;
+            else if (PPUCTRL.nametableBase == 0x02)
+                return 0x2800;
+            else
+                return 0x2C00;
+        }
+        uint16_t bgPatternTblBaseAddr() const {
+            if (PPUCTRL.backgroundPatternBase2)
+                return 0x1000;
+            else
+                return 0x0000;
+        }
+        uint16_t spritePatternTableBaseAddr() const {
+            if (PPUCTRL.spritePatternBase2 && !PPUCTRL.spritesAre8x16)
+                return 0x1000;
+            else
+                return 0x0000;
+        }
+
         void renderScanline();
         void plot(uint16_t x, uint16_t y, uint32_t color);
 
@@ -179,7 +177,6 @@ class NES_PPU : public Device {
         uint8_t getTileID(uint16_t x, uint16_t y);
         uint8_t getPixel(uint8_t id, uint8_t row, uint8_t x);
         uint8_t getAttr(uint16_t x, uint16_t y);
-        void renderTile(uint16_t x, uint16_t y);
 
         void renderPatternTable(uint16_t table, uint16_t screenX, uint16_t screenY);
 

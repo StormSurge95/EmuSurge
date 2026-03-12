@@ -22,7 +22,8 @@ class Cartridge : public Device {
     public:
         enum MIRROR {
             HORIZONTAL,
-            VERTICAL
+            VERTICAL,
+            FOUR_SCREEN
         };
 
         Cartridge(const std::string& filename);

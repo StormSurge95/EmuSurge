@@ -10,7 +10,7 @@ Cartridge::Cartridge(const std::string& filename) {
     if (!file) return;
 
     // read header metadata
-    INESHeader header;
+    INESHeader header{};
     file.read(reinterpret_cast<char*>(&header), sizeof(INESHeader));
 
     // verify that ROM is a NES ROM
@@ -26,7 +26,7 @@ Cartridge::Cartridge(const std::string& filename) {
     // get mapper id
     mapperID = ((header.flags7 >> 4) << 4) | (header.flags6 >> 4);
 
-    mirror = (header.flags6 & 0x01) ? VERTICAL : HORIZONTAL;
+    mirror = ((header.flags6 & 0x04) ? FOUR_SCREEN : (header.flags6 & 0x01) ? VERTICAL : HORIZONTAL);
 
     if (header.flags6 & 0x04) file.seekg(file.cur + 512);
 
@@ -36,6 +36,7 @@ Cartridge::Cartridge(const std::string& filename) {
 
     if (chrBanks == 0) {
         chrMemory.resize(8192);
+        std::fill(chrMemory.begin(), chrMemory.end(), 0);
     } else {
         chrMemory.resize((size_t)chrBanks * 8192);
         file.read(reinterpret_cast<char*>(chrMemory.data()), chrMemory.size());
@@ -70,7 +71,6 @@ bool Cartridge::ppuRead(uint16_t addr, uint8_t& data) {
 bool Cartridge::ppuWrite(uint16_t addr, uint8_t data) {
     if (addr < 0x2000) {
         if (chrBanks == 0) {
-            printf("CHR WRITE: %04X = %02X\n", addr, data);
             chrMemory[addr] = data;
             return true;
         }

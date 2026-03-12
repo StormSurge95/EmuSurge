@@ -53,7 +53,7 @@ void NES::clock() {
         if (systemClockCounter % 3 == 0)
             cpu.get()->clock();
 
-        if (ppu.get()->isInVblank() && ppu.get()->nmiRequested) {
+        if (ppu.get()->nmiRequested) {
             cpu.get()->NMI();
             ppu->nmiRequested = false;
         }

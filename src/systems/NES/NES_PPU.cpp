@@ -1,9 +1,6 @@
 #include "NES_PPU.h"
-#include "../../core/Helpers.h"
 
-NES_PPU::NES_PPU() {
-    std::fill(frameBuffer.begin(), frameBuffer.end(), 0);
-}
+NES_PPU::NES_PPU() {}
 
 NES_PPU::~NES_PPU() {}
 
@@ -38,7 +35,7 @@ uint8_t NES_PPU::read(uint16_t addr, bool readonly) {
         switch (addr) {
             case 0x02: // PPUSTATUS
                 if (!readonly) w = false;
-                return PPUSTATUS;
+                return PPUSTATUS.value();
             case 0x04: // OAMDATA
                 return OAMDATA;
             case 0x07: // PPUDATA
@@ -81,7 +78,7 @@ void NES_PPU::write(uint16_t addr, uint8_t data) {
                 break;
             case 0x07: // PPU DATA
                 ppuWrite(vramAddr, data);
-                if (incrementMode())
+                if (PPUCTRL.incrementBy32)
                     vramAddr += 32;
                 else
                     vramAddr += 1;
@@ -168,7 +165,7 @@ void NES_PPU::plot(uint16_t x, uint16_t y, uint32_t color) {
 
 void NES_PPU::onPreLine() {
     if (cycle == 1) {
-        isInVblank(false);
+        PPUSTATUS.isInVblank = false;
     }
 }
 
@@ -178,8 +175,8 @@ void NES_PPU::onVisibleLine() {
 
 void NES_PPU::onVBlankLine() {
     if (cycle == 1) {
-        isInVblank(true);
-        if (nmiEnabled()) {
+        PPUSTATUS.isInVblank = true;
+        if (PPUCTRL.nmi_enabled) {
             nmiRequested = true;
         }
     }
