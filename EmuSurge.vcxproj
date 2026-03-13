@@ -157,6 +157,7 @@
     <ClInclude Include="src\core\VideoTypes.h" />
     <ClInclude Include="src\systems\NES\Cartridge.h" />
     <ClInclude Include="src\systems\NES\NES.h" />
+    <ClInclude Include="src\systems\NES\NES_Bus.h" />
     <ClInclude Include="src\systems\NES\NES_CPU.h" />
     <ClInclude Include="src\systems\NES\NES_PPU.h" />
   </ItemGroup>

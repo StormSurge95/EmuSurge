@@ -17,6 +17,9 @@ class NES_CPU : public Device {
 
         inline void connectBus(Bus* b) { bus = b; }
 
+        uint8_t read(uint16_t addr, bool readonly = false) override;
+        void write(uint16_t addr, uint8_t data) override;
+
         void reset();
         void clock();
 
@@ -62,9 +65,6 @@ class NES_CPU : public Device {
         };
         uint8_t fetch();
         std::vector<Instruction> lookup;
-
-        uint8_t read(uint16_t addr, bool readonly = false) override;
-        void write(uint16_t addr, uint8_t data) override;
 
         inline uint8_t getFlag(FLAGS f) const { return ((status & f) > 0) ? 1 : 0; }
         inline void setFlag(FLAGS f, bool v) { status = (v ? status |= f : status &= ~f); }

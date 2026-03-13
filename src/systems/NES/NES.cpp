@@ -1,10 +1,11 @@
 #include "NES.h"
+#include "NES_Bus.h"
 
 NES::NES(bool d) {
     debug = d;
 
     // initialize bus & cpu
-    bus = std::make_unique<Bus>();
+    bus = std::make_unique<NES_Bus>();
     cpu = std::make_unique<NES_CPU>();
 
     // connect CPU to bus
@@ -50,11 +51,13 @@ void NES::clock() {
     do {
         ppu.get()->clock();
 
-        if (systemClockCounter % 3 == 0)
-            cpu.get()->clock();
+        if (systemClockCounter % 3 == 0) {
+            if (bus->dmaActive) bus->clockDMA(systemClockCounter);
+            else cpu->clock();
+        }
 
         if (ppu.get()->nmiRequested) {
-            cpu.get()->NMI();
+            cpu->NMI();
             ppu->nmiRequested = false;
         }
 

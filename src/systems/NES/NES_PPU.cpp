@@ -1,6 +1,12 @@
 #include "NES_PPU.h"
 
-NES_PPU::NES_PPU() {}
+NES_PPU::NES_PPU() {
+    primaryOAM.reserve(256);
+    primaryOAM.clear();
+
+    secondaryOAM.reserve(32);
+    secondaryOAM.clear();
+}
 
 NES_PPU::~NES_PPU() {}
 
@@ -48,6 +54,14 @@ void NES_PPU::clock() {
             copyHorizontalBits();
         else if (scanline == 261 && cycle >= 280 && cycle <= 304)
             copyVerticalBits();
+    }
+
+    // SPRITE EVALUATION
+    if (rendering && scanline >= 0 && scanline < 240) {
+        if (cycle == 65)
+            evaluateSprites();
+        else if (cycle == 257)
+            fetchSpritePatterns();
     }
 
     // VBLANK AND PRE-RENDER EVENTS
@@ -254,6 +268,28 @@ const uint32_t* NES_PPU::getFrameBuffer() const {
 }
 
 void NES_PPU::evaluateSprites() {
+    if (primaryOAM.size() < 256) return;
+
+    secondaryOAM.clear();
+
+    for (int s = 0; s < 64; s++) {
+        int base = s * 4;
+
+        uint8_t top = primaryOAM[base] + 1;
+
+        if (scanline >= top && scanline < (top + spriteHeight())) {
+            if (secondaryOAM.size() < 32) {
+                secondaryOAM.insert(secondaryOAM.end(), {
+                    primaryOAM[base],
+                    primaryOAM[base + 1],
+                    primaryOAM[base + 2],
+                    primaryOAM[base + 3] });
+            } else {
+                PPUSTATUS.spriteOverflow = true;
+                break;
+            }
+        }
+    }
 }
 
 void NES_PPU::renderPixel() {
@@ -274,12 +310,130 @@ void NES_PPU::renderPixel() {
         attr = 0;
     }
 
+    SPRITE_PIXEL spr = getSpritePixel();
+
+    bool bgTrans = pixel == 0;
+    bool sprTrans = spr.color == 0;
+
+    if (spr.sprite0 && !bgTrans && !sprTrans)
+        PPUSTATUS.spriteZeroHit = true;
+
+    uint8_t finalPixel;
+    uint8_t finalPalette;
+
+    if (bgTrans && sprTrans) {
+        finalPixel = 0x00;
+        finalPalette = 0x00;
+    } else if (bgTrans) {
+        finalPixel = spr.color;
+        finalPalette = 4 + spr.palette;
+    } else if (sprTrans) {
+        finalPixel = pixel;
+        finalPalette = attr;
+    } else if (spr.priority == 0) {
+        finalPixel = spr.color;
+        finalPalette = 4 + spr.palette;
+    } else {
+        finalPixel = pixel;
+        finalPalette = attr;
+    }
+
     uint16_t paletteAddr = 0x3F00;
 
-    if (pixel != 0) paletteAddr += (attr << 2) + pixel;
+    if (finalPixel != 0) paletteAddr += (finalPalette << 2) + finalPixel;
 
     uint8_t index = 0;
     ppuRead(paletteAddr, index);
 
     frameBuffer[(size_t)scanline * 256 + ((size_t)cycle - 1)] = masterPalette[index & 0x3F];
+}
+
+bool NES_PPU::writeDMAByte(uint8_t data) {
+    primaryOAM.push_back(data);
+    return primaryOAM.size() == 256;
+}
+
+void NES_PPU::fetchSpritePatterns() {
+    uint8_t h = spriteHeight();
+
+    for (int i = 0; i < 8; i++) {
+        spriteUnits[i].clear();
+    }
+
+    for (int i = 0; i < secondaryOAM.size(); i += 4) {
+        SPRITE s;
+        s.yCoord = secondaryOAM[i];
+        s.tileIndex = secondaryOAM[i + 1];
+        s.attr = SPRITE::ATTR(secondaryOAM[i + 2]);
+        s.xCoord = secondaryOAM[i + 3];
+
+        uint8_t row = scanline - (s.yCoord + 1);
+
+        if (s.attr.verticalFlip)
+            row = h - 1 - row;
+
+        uint16_t addr = getSpriteAddress(s.tileIndex, (row & (spriteHeight() - 1)));
+
+        uint8_t p0, p1;
+        ppuRead(addr, p0);
+        ppuRead(addr + 8, p1);
+
+        if (s.attr.horizontalFlip) {
+            reverseByte(p0);
+            reverseByte(p1);
+        }
+
+        spriteUnits[i].set(s.xCoord, p0, p1, s.attr.value());
+    }
+}
+
+uint16_t NES_PPU::getSpriteAddress(uint8_t index, uint8_t row) {
+    if (PPUCTRL.spritesAre8x16) {
+        uint16_t table = (index & 1) * 0x1000;
+        uint16_t tile = (index & 0xFE);
+
+        if (row >= 8) {
+            tile++;
+            row -= 8;
+        }
+
+        return table + tile * 16 + row;
+    } else {
+        uint16_t tileAddr = spritePatternTableBaseAddr() + index * 16;
+        return tileAddr + (row & 0x07);
+    }
+}
+
+NES_PPU::SPRITE_PIXEL NES_PPU::getSpritePixel() {
+    for (uint8_t i = 0; i < 8; i++) {
+        SPRITE_RENDER_UNIT* u = &spriteUnits[i];
+
+        if (u->xCounter > 0) {
+            u->xCounter--;
+            continue;
+        }
+
+        uint8_t b0 = (u->patternLo >> 7) & 1;
+        uint8_t b1 = (u->patternHi >> 7) & 1;
+
+        u->patternLo <<= 1;
+        u->patternHi <<= 1;
+
+        uint8_t c = (b1 << 1) | b0;
+
+        if (c == 0) continue;
+
+        uint8_t p = (u->attr >> 2) & 3;
+        uint8_t f = (u->attr >> 5) & 1;
+
+        return SPRITE_PIXEL(c, p, f, i == 0);
+    }
+
+    return SPRITE_PIXEL();
+}
+
+void NES_PPU::reverseByte(uint8_t& b) {
+    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+    b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
 }

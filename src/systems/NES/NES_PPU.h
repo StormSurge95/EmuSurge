@@ -26,6 +26,8 @@ class NES_PPU : public Device {
         const uint32_t* getFrameBuffer() const;
         inline void connectCartridge(Cartridge* cartridge) { cart = cartridge; }
 
+        bool writeDMAByte(uint8_t data);
+
     private:
         Cartridge* cart = nullptr;
         bool oddFrame = false;
@@ -277,18 +279,75 @@ class NES_PPU : public Device {
             struct ATTR {
                 bool verticalFlip = false;
                 bool horizontalFlip = false;
-                bool priority = true;
+                bool priority = false;
                 uint8_t palette = 0x00;
+
+                ATTR() = default;
+
+                ATTR(uint8_t b) {
+                    verticalFlip = !!(b & 0b10000000);
+                    horizontalFlip = !!(b & 0b01000000);
+                    priority = !!(b & 0b00100000);
+                    palette = (b & 0x00001100) >> 2;
+                }
 
                 ATTR& operator=(uint8_t b) {
                     verticalFlip = !!(b & 0b10000000);
                     horizontalFlip = !!(b & 0b01000000);
-                    priority = !(b & 0b00100000);
+                    priority = !!(b & 0b00100000);
                     palette = (b & 0x00001100) >> 2;
+                }
+
+                uint8_t value() const {
+                    return ((+verticalFlip << 7) |
+                            (+horizontalFlip << 6) |
+                            (+priority << 5) |
+                            (palette << 2));
                 }
             } attr{};
             uint8_t xCoord = 0x00;
         };
-        uint8_t primaryOAM[256]{ 0 };
+        std::vector<uint8_t> primaryOAM;
+        std::vector<uint8_t> secondaryOAM;
         void evaluateSprites();
+        void fetchSpritePatterns();
+        inline uint8_t spriteHeight() const { return 8 + (PPUCTRL.spritesAre8x16 ? 8 : 0); }
+        uint16_t getSpriteAddress(uint8_t index, uint8_t row);
+
+        struct SPRITE_RENDER_UNIT {
+            uint8_t xCounter = 0xFF;
+            uint8_t patternLo = 0x00;
+            uint8_t patternHi = 0x00;
+            uint8_t attr = 0x00;
+
+            void clear() {
+                xCounter = 0xFF;
+                patternLo = patternHi = attr = 0x00;
+            }
+
+            void set(uint8_t x, uint8_t l, uint8_t h, uint8_t a) {
+                xCounter = x;
+                patternLo = l;
+                patternHi = h;
+                attr = a;
+            }
+        };
+        SPRITE_RENDER_UNIT spriteUnits[8];
+        void reverseByte(uint8_t& b);
+        struct SPRITE_PIXEL {
+            uint8_t color = 0x00;
+            uint8_t palette = 0x00;
+            uint8_t priority = 0x00;
+            bool sprite0 = false;
+
+            SPRITE_PIXEL() {}
+
+            SPRITE_PIXEL(uint8_t c, uint8_t p, uint8_t f, bool z) {
+                color = c;
+                palette = p;
+                priority = f;
+                sprite0 = z;
+            }
+        };
+        SPRITE_PIXEL getSpritePixel();
 };

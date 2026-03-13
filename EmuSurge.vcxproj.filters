@@ -63,6 +63,9 @@
     <ClInclude Include="src\core\Helpers.h">
       <Filter>Header Files\core</Filter>
     </ClInclude>
+    <ClInclude Include="src\systems\NES\NES_Bus.h">
+      <Filter>Header Files\systems\NES</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\frontend\SDLRenderer.cpp">
