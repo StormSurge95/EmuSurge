@@ -105,6 +105,7 @@ class NES_PPU : public Device {
                 spriteOverflow = !!(val & (1 << 5));
                 spriteZeroHit = !!(val & (1 << 6));
                 isInVblank = !!(val & (1 << 7));
+                return *this;
             }
 
             uint8_t value() const {

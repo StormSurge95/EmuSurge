@@ -1,8 +1,7 @@
 #include "NES_PPU.h"
 
 NES_PPU::NES_PPU() {
-    primaryOAM.reserve(256);
-    primaryOAM.clear();
+    primaryOAM.resize(256, 0x00);
 
     secondaryOAM.reserve(32);
     secondaryOAM.clear();
@@ -349,8 +348,8 @@ void NES_PPU::renderPixel() {
 }
 
 bool NES_PPU::writeDMAByte(uint8_t data) {
-    primaryOAM.push_back(data);
-    return primaryOAM.size() == 256;
+    primaryOAM[OAMADDR++] = data;
+    return OAMADDR == 0;
 }
 
 void NES_PPU::fetchSpritePatterns() {
@@ -360,7 +359,9 @@ void NES_PPU::fetchSpritePatterns() {
         spriteUnits[i].clear();
     }
 
-    for (int i = 0; i < secondaryOAM.size(); i += 4) {
+    for (uint8_t i = 0; i < secondaryOAM.size(); i += 4) {
+        uint8_t unitIndex = i / 4;
+
         SPRITE s;
         s.yCoord = secondaryOAM[i];
         s.tileIndex = secondaryOAM[i + 1];
@@ -383,7 +384,7 @@ void NES_PPU::fetchSpritePatterns() {
             reverseByte(p1);
         }
 
-        spriteUnits[i].set(s.xCoord, p0, p1, s.attr.value());
+        spriteUnits[unitIndex].set(s.xCoord, p0, p1, s.attr.value());
     }
 }
 
