@@ -4,28 +4,33 @@
 
 class M001 : public Mapper {
     public:
-        M001(uint8_t prgBanks, uint8_t chrBanks) : Mapper(prgBanks, chrBanks) {}
+        M001(uint8_t prgBanks, std::vector<uint8_t>& prgMemory, uint8_t chrBanks, std::vector<uint8_t>& chrMemory) {
+            this->prgBanks = prgBanks;
+            this->prgMemory = &prgMemory;
+            this->chrBanks = chrBanks;
+            this->chrMemory = &chrMemory;
+        }
 
         uint8_t cpuRead(uint16_t addr, bool readonly = false) override {
-            uint8_t data = 0x00;
             if (addr >= 0x8000) {
                 if (prgMode == 0 || prgMode == 1) {
                     uint16_t bank = (prgBank & 0x0E);
-                    data = (bank * 0x4000) + (addr & 0x7FFF);
+                    addr = (bank * 0x4000) + (addr & 0x7FFF);
+                    return (*this->prgMemory)[addr];
                 } else if (prgMode == 2) {
-                    if (addr < 0xC000)
-                        data = addr & 0x3FFF;
-                    else
-                        data = (prgBank * 0x4000) + (addr & 0x3FFF);
+                    if (addr < 0xC000) addr = addr & 0x3FFF;
+                    else addr = (prgBank * 0x4000) + (addr & 0x3FFF);
+
+                    return (*this->prgMemory)[addr];
                 } else if (prgMode == 3) {
-                    if (addr < 0xC000)
-                        data = (prgBank * 0x4000) + (addr & 0x3FFF);
-                    else
-                        data = ((prgBanks - 1) * 0x4000) + (addr & 0x3FFF);
+                    if (addr < 0xC000) addr = (prgBank * 0x4000) + (addr & 0x3FFF);
+                    else addr = ((prgBanks - 1) * 0x4000) + (addr & 0x3FFF);
+
+                    return (*this->prgMemory)[addr];
                 }
             }
 
-            return data;
+            return 0x00;
         }
 
         void cpuWrite(uint16_t addr, uint8_t data) override {
@@ -70,28 +75,24 @@ class M001 : public Mapper {
         }
 
         uint8_t ppuRead(uint16_t addr, bool readonly = false) override {
-            uint8_t data = 0x00;
-
             if (addr < 0x2000) {
-                if (chrMode == 0)
-                    data = ((chrBanks & 0x1E) * 0x1000) + addr;
-                else if (addr < 0x1000)
-                    data = (chrBank0 * 0x1000) + (addr & 0x0FFF);
-                else
-                    data = (chrBank1 * 0x1000) + (addr & 0x0FFF);
+                if (chrMode == 0) addr = ((chrBanks & 0x1E) * 0x1000) + addr;
+                else if (addr < 0x1000) addr = (chrBank0 * 0x1000) + (addr & 0x0FFF);
+                else addr = (chrBank1 * 0x1000) + (addr & 0x0FFF);
+
+                return (*this->chrMemory)[addr];
             }
 
-            return data;
+            return 0x00;
         }
 
         void ppuWrite(uint16_t addr, uint8_t data) override {
             if (addr < 0x2000) {
-                if (chrMode == 0)
-                    data = ((chrBank0 & 0x1E) * 0x1000) + addr;
-                else if (addr < 0x1000)
-                    data = (chrBank0 * 0x1000) + (addr & 0x0FFF);
-                else
-                    data = (chrBank1 * 0x1000) + (addr & 0x0FFF);
+                if (chrMode == 0) addr = ((chrBank0 & 0x1E) * 0x1000) + addr;
+                else if (addr < 0x1000) addr = (chrBank0 * 0x1000) + (addr & 0x0FFF);
+                else addr = (chrBank1 * 0x1000) + (addr & 0x0FFF);
+
+                (*this->chrMemory)[addr] = data;
             }
         }
 

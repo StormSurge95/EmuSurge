@@ -3,7 +3,7 @@
 #include "./systems/NES/NES.h"
 
 int main(int argc, int* argv[]) {
-    NES* nes = new NES(true);
+    NES* nes = new NES();
     if (!nes->loadCartridge("C:/roms/NES/Tests/nestest.nes")) return 1;
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))

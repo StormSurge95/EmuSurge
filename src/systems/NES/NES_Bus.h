@@ -9,7 +9,7 @@ class NES_CPU;
 class NES_PPU;
 class NES_Controller;
 class NES_APU;
-class Mapper;
+class Cartridge;
 
 class NES_Bus : public Bus {
     public:
@@ -17,7 +17,7 @@ class NES_Bus : public Bus {
         std::shared_ptr<NES_CPU> cpu = nullptr;
         std::shared_ptr<NES_PPU> ppu = nullptr;
         std::shared_ptr<NES_APU> apu = nullptr;
-        std::shared_ptr<Mapper> mapper = nullptr;
+        std::shared_ptr<Cartridge> cart = nullptr;
         std::shared_ptr<NES_Controller> controller1 = nullptr;
         std::shared_ptr<NES_Controller> controller2 = nullptr;
 
@@ -30,7 +30,7 @@ class NES_Bus : public Bus {
         void connectCPU(std::shared_ptr<NES_CPU> cpu) { this->cpu = cpu; }
         void connectPPU(std::shared_ptr<NES_PPU> ppu) { this->ppu = ppu; }
         void connectAPU(std::shared_ptr<NES_APU> apu) { this->apu = apu; }
-        void connectMapper(std::shared_ptr<Mapper> mapper) { this->mapper = mapper; }
+        void connectCartridge(std::shared_ptr<Cartridge> cart) { this->cart = cart; }
         void connectController(std::shared_ptr<NES_Controller> c, uint8_t player);
         void disconnectController(uint8_t player);
 };

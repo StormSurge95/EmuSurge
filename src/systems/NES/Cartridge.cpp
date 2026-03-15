@@ -32,11 +32,8 @@ Cartridge::Cartridge(const std::string& filename) {
     initMapper(mapperID);
 
     mirror = ((header.flags6 & 0x08) ? FOUR_SCREEN : (header.flags6 & 0x01) ? VERTICAL : HORIZONTAL);
-    std::stringstream ss;
-    ss << "address before trainer search: " << file.tellg() << std::endl;
+
     if (header.flags6 & 0x04) file.seekg(512, std::ios::cur);
-    ss << "address after trainer search:  " << file.tellg() << std::endl;
-    printf(ss.str().c_str());
 
     // read prgMemory
     prgMemory.resize((size_t)prgBanks * 16384);
@@ -54,31 +51,31 @@ Cartridge::Cartridge(const std::string& filename) {
 }
 
 uint8_t Cartridge::read(uint16_t addr, bool readonly) {
-    return mapper->cpuRead(addr, readonly);
+    return this->mapper->cpuRead(addr, readonly);
 }
 
 void Cartridge::write(uint16_t addr, uint8_t data) {
-    mapper->cpuWrite(addr, data);
+    this->mapper->cpuWrite(addr, data);
 }
 
 uint8_t Cartridge::ppuRead(uint16_t addr, bool readonly) {
-    return mapper->ppuRead(addr, readonly);
+    return this->mapper->ppuRead(addr, readonly);
 }
 
 void Cartridge::ppuWrite(uint16_t addr, uint8_t data) {
-    mapper->ppuWrite(addr, data);
+    this->mapper->ppuWrite(addr, data);
 }
 
 void Cartridge::initMapper(uint8_t id) {
     switch (id) {
         case 0:
-            mapper = std::make_unique<M000>(prgBanks, chrBanks);
+            mapper = std::make_unique<M000>(prgBanks, prgMemory, chrBanks, chrMemory);
             break;
         case 1:
-            mapper = std::make_unique<M001>(prgBanks, chrBanks);
+            mapper = std::make_unique<M001>(prgBanks, prgMemory, chrBanks, chrMemory);
             break;
         case 2:
-            mapper = std::make_unique<M002>(prgBanks, chrBanks);
+            mapper = std::make_unique<M002>(prgBanks, prgMemory, chrBanks, chrMemory);
             break;
         default: return;
     }

@@ -6,19 +6,20 @@
 
 #include "../../core/Device.h"
 #include "Cartridge.h"
-#include "Mappers/Mapper.h"
 #include "NES_CPU.h"
 
 class NES_PPU : public Device {
     public:
         bool nmiRequested = false;
         bool frameComplete = false;
+        uint16_t scanline = 0;
+        uint16_t cycle = 0;
 
         NES_PPU();
-        ~NES_PPU();
+        ~NES_PPU() = default;
 
         void clock();
-        void reset();
+        void reset() {}
 
         uint8_t read(uint16_t addr, bool readonly = false) override;
         void write(uint16_t addr, uint8_t data) override;
@@ -26,123 +27,14 @@ class NES_PPU : public Device {
         uint8_t ppuRead(uint16_t addr, bool readonly = false);
         void ppuWrite(uint16_t addr, uint8_t data);
 
-        const uint32_t* getFrameBuffer() const;
-        void connectCartridge(std::shared_ptr<Cartridge> cartridge);
-
-        bool writeDMAByte(uint8_t data);
+        const uint32_t* getFrameBuffer() const { return frameBuffer.data(); }
+        void connectCartridge(std::shared_ptr<Cartridge> cart) { this->cart = cart; }
 
     private:
-        std::shared_ptr<Cartridge> cart = nullptr;
-        std::shared_ptr<Mapper> mapper = nullptr;
-        std::shared_ptr<NES_CPU> cpu;
         bool oddFrame = false;
-
-        // CPU visible registers
-        struct CONTROL {
-            uint8_t nametableBase = 0;              // bits 0-1
-            bool incrementBy32 = false;             // bit 2
-            bool spritePatternBase2 = false;        // bit 3
-            bool backgroundPatternBase2 = false;    // bit 4
-            bool spritesAre8x16 = false;            // bit 5
-            const bool masterSlave = false;         // bit 6
-            bool nmi_enabled = false;               // bit 7
-
-            CONTROL& operator=(uint8_t val) {
-                nametableBase = (uint8_t)(val & 0x03);
-                incrementBy32 = !!(val & (1 << 2));
-                spritePatternBase2 = !!(val & (1 << 3));
-                backgroundPatternBase2 = !!(val & (1 << 4));
-                spritesAre8x16 = !!(val & (1 << 5));
-                nmi_enabled = !!(val & (1 << 7));
-                return *this;
-            }
-
-            uint8_t value() const {
-                return (
-                    (+nmi_enabled << 7) |
-                    (+spritesAre8x16 << 5) |
-                    (+backgroundPatternBase2 << 4) |
-                    (+spritePatternBase2 << 3) |
-                    (+incrementBy32 << 2) |
-                    nametableBase);
-            }
-        } PPUCTRL;
-        struct MASK {
-            bool greyscaleMode = false;
-            bool enableBackgroundLeft = false;
-            bool enableSpritesLeft = false;
-            bool enableBackground = false;
-            bool enableSprites = false;
-            bool emphasizeRed = false;
-            bool emphasizeGreen = false;
-            bool emphasizeBlue = false;
-
-            MASK& operator=(uint8_t val) {
-                greyscaleMode = !!(val & (1 << 0));
-                enableBackgroundLeft = !!(val & (1 << 1));
-                enableSpritesLeft = !!(val & (1 << 2));
-                enableBackground = !!(val & (1 << 3));
-                enableSprites = !!(val & (1 << 4));
-                emphasizeRed = !!(val & (1 << 5));
-                emphasizeGreen = !!(val & (1 << 6));
-                emphasizeBlue = !!(val & (1 << 7));
-                return *this;
-            }
-
-            uint8_t value() const {
-                return (
-                    (+emphasizeBlue << 7) |
-                    (+emphasizeGreen << 6) |
-                    (+emphasizeRed << 5) |
-                    (+enableSprites << 4) |
-                    (+enableBackground << 3) |
-                    (+enableSpritesLeft << 2) |
-                    (+enableBackgroundLeft << 1) |
-                    (+greyscaleMode));
-            }
-        } PPUMASK;
-        struct STATUS {
-            bool spriteOverflow = false;
-            bool spriteZeroHit = false;
-            bool isInVblank = false;
-
-            STATUS& operator=(uint8_t val) {
-                spriteOverflow = !!(val & (1 << 5));
-                spriteZeroHit = !!(val & (1 << 6));
-                isInVblank = !!(val & (1 << 7));
-                return *this;
-            }
-
-            uint8_t value() const {
-                return (
-                    (+isInVblank << 7) |
-                    (+spriteZeroHit << 6) |
-                    (+spriteOverflow << 5));
-            }
-        } PPUSTATUS;
-        uint8_t OAMADDR = 0x00;
-        uint8_t OAMDATA = 0x00;
-        uint8_t PPUSCROLL = 0x00;
-        uint8_t PPUADDR = 0x00;
-        uint8_t PPUDATA = 0x00;
-        uint8_t dataBuffer = 0x00;
-        uint8_t OAMDMA = 0x00;
-
-        uint16_t cycle = 0x0000;
-        uint16_t scanline = 0x0000;
-        uint64_t frame = 0x0000000000000000;
-
-        std::array<uint32_t, 256 * 240> frameBuffer{ 0 };
-
-        // scroll variables
-        bool w = false; // write latch
-        uint16_t vramAddr = 0;
-        uint16_t v = 0; // scroll position/current VRAM address
-        uint16_t t = 0; // START scroll position/next VRAM address
-        uint8_t fine_x = 0;  // fine-x position of current scroll
-
-        std::array<uint8_t, 2048> nametables{ 0 };
-        std::array<uint32_t, 32> paletteRam{ 0 };
+        std::shared_ptr<Cartridge> cart = nullptr;
+        std::shared_ptr<NES_CPU> cpu = nullptr;
+        std::array<uint32_t, 61440> frameBuffer{ 0 };
         std::array<uint32_t, 64> masterPalette = {
             0xFF666666,0xFF002A88,0xFF1412A7,0xFF3B00A4,0xFF5C007E,0xFF6E0040,0xFF6C0600,0xFF561D00,
             0xFF333500,0xFF0B4800,0xFF005200,0xFF004F08,0xFF00404D,0xFF000000,0xFF000000,0xFF000000,
@@ -153,222 +45,180 @@ class NES_PPU : public Device {
             0xFFFFFEFF,0xFFC0DFFF,0xFFD3D2FF,0xFFE8C8FF,0xFFFBC2FF,0xFFFEC4EA,0xFFFECCC5,0xFFF7D8A5,
             0xFFE4E594,0xFFCFEF96,0xFFBDF4AB,0xFFB3F3CC,0xFFB5EBF2,0xFFB8B8B8,0xFF000000,0xFF000000
         };
+        std::array<uint8_t, 4096> nametables{ 0 };
+        std::array<uint8_t, 32> palettes{ 0 };
+        std::array<uint8_t, 256> primaryOAM{ 0 };
 
-        uint16_t nametableBaseAddr() const {
-            if (PPUCTRL.nametableBase == 0x00)
-                return 0x2000;
-            else if (PPUCTRL.nametableBase == 0x01)
-                return 0x2400;
-            else if (PPUCTRL.nametableBase == 0x02)
-                return 0x2800;
-            else
-                return 0x2C00;
-        }
-        uint16_t bgPatternTblBaseAddr() const {
-            if (PPUCTRL.backgroundPatternBase2)
-                return 0x1000;
-            else
-                return 0x0000;
-        }
-        uint16_t spritePatternTableBaseAddr() const {
-            if (PPUCTRL.spritePatternBase2 && !PPUCTRL.spritesAre8x16)
-                return 0x1000;
-            else
-                return 0x0000;
-        }
+        // REGISTERS
+        struct control {
+            uint8_t nametableBase = 0;
+            bool incrementBy32 = false;
+            bool spritePatternBase = false;
+            bool backgroundPatternBase = false;
+            bool spritesAre8x16 = false;
+            bool nmiEnabled = false;
 
-        uint16_t val = 0x03C0;
+            control(uint8_t value) {
+                this->nametableBase = (uint8_t(value & 0x03));
+                this->incrementBy32 = !!(value & (1 << 2));
+                this->spritePatternBase = !!(value & (1 << 3));
+                this->backgroundPatternBase = !!(value & (1 << 4));
+                this->spritesAre8x16 = !!(value & (1 << 5));
+                this->nmiEnabled = !!(value & 1 << 7);
+            }
 
-        uint16_t ntbase = 0;
-        uint16_t bptbase = 0;
+            control& operator=(uint8_t value) {
+                this->nametableBase = (uint8_t(value & 0x03));
+                this->incrementBy32 = !!(value & (1 << 2));
+                this->spritePatternBase = !!(value & (1 << 3));
+                this->backgroundPatternBase = !!(value & (1 << 4));
+                this->spritesAre8x16 = !!(value & (1 << 5));
+                this->nmiEnabled = !!(value & 1 << 7);
+                return *this;
+            }
 
-        //void onPreLine();
-        //void onVisibleLine();
-        //void onVBlankLine();
-        //void renderScanlineBG();
-        //void plotBG(uint16_t x, uint16_t y, uint32_t c, uint8_t ci);
-        //uint32_t getColor(uint8_t palette, uint8_t index);
-        //uint8_t getBackgroundPaletteID(uint8_t nametable, uint16_t x, uint16_t y);
-        inline uint8_t nametableID(uint8_t x) const {
-            uint16_t base = PPUCTRL.nametableBase;
-            int offsets[4] = { 1, -1, 1, -1 };
-            uint16_t offset =
-                x >= 256 ? offsets[base] : 0;
-            return base + offset;
-        }
+            uint8_t value() const {
+                return (
+                    (+this->nmiEnabled << 7) |
+                    (+this->spritesAre8x16 << 5) |
+                    (+this->backgroundPatternBase << 4) |
+                    (+this->spritePatternBase << 3) |
+                    (+this->incrementBy32 << 2) |
+                    this->nametableBase
+                );
+            }
 
-        inline void triggerNMI() { nmiRequested = true; }
+            uint16_t backgroundPatternSelect() const { return (this->backgroundPatternBase ? 0x1000 : 0x0000); }
+            uint16_t spritePatternSelect() const { return (this->spritePatternBase ? 0x1000 : 0x0000); }
+            uint8_t incrementMode() const { return (this->incrementBy32 ? 32 : 1); }
+            uint16_t nametableSelect() const {
+                switch (this->nametableBase) {
+                    case 0x00:
+                        return 0x2000;
+                    case 0x01:
+                        return 0x2400;
+                    case 0x02:
+                        return 0x2800;
+                    case 0x03:
+                        return 0x2C00;
+                }
+            }
+        } PPUCTRL;
+        struct mask {
+            bool greyscaleMode = false;
+            bool enableBackgroundLeft = false;
+            bool enableSpritesLeft = false;
+            bool enableBackground = false;
+            bool enableSprites = false;
+            bool emphasizeRed = false;
+            bool emphasizeGreen = false;
+            bool emphasizeBlue = false;
 
-        // tile latches
+            mask(uint8_t value) {
+                this->greyscaleMode =           !!(value & (1 << 0));
+                this->enableBackgroundLeft =    !!(value & (1 << 1));
+                this->enableSpritesLeft =       !!(value & (1 << 2));
+                this->enableBackground =        !!(value & (1 << 3));
+                this->enableSprites =           !!(value & (1 << 4));
+                this->emphasizeRed =            !!(value & (1 << 5));
+                this->emphasizeGreen =          !!(value & (1 << 6));
+                this->emphasizeBlue =           !!(value & (1 << 7));
+            }
+
+            mask& operator=(uint8_t value) {
+                this->greyscaleMode = !!(value & (1 << 0));
+                this->enableBackgroundLeft = !!(value & (1 << 1));
+                this->enableSpritesLeft = !!(value & (1 << 2));
+                this->enableBackground = !!(value & (1 << 3));
+                this->enableSprites = !!(value & (1 << 4));
+                this->emphasizeRed = !!(value & (1 << 5));
+                this->emphasizeGreen = !!(value & (1 << 6));
+                this->emphasizeBlue = !!(value & (1 << 7));
+                return *this;
+            }
+            uint8_t value() const {
+                return (
+                    (+emphasizeBlue << 7) |
+                    (+emphasizeGreen << 6) |
+                    (+emphasizeRed << 5) |
+                    (+enableSprites << 4) |
+                    (+enableBackground << 3) |
+                    (+enableSpritesLeft << 2) |
+                    (+enableBackgroundLeft << 1) |
+                    (+greyscaleMode)
+                );
+            }
+        } PPUMASK;
+        struct status {
+            bool spriteOverflow = false;
+            bool spriteZeroHit = false;
+            bool isInVblank = false;
+            uint8_t openBus = 0;
+
+            status(uint8_t value) {
+                this->isInVblank = !!(value & (1 << 7));
+                this->spriteZeroHit = !!(value & (1 << 6));
+                this->spriteOverflow = !!(value & (1 << 5));
+                this->openBus = (value & ((1 << 5) - 1));
+            }
+
+            status& operator=(uint8_t value) {
+                this->isInVblank = !!(value & (1 << 7));
+                this->spriteZeroHit = !!(value & (1 << 6));
+                this->spriteOverflow = !!(value & (1 << 5));
+                this->openBus = (value & ((1 << 5) - 1));
+                return *this;
+            }
+
+            uint8_t value() const {
+                return (
+                    (+this->isInVblank << 7) |
+                    (+this->spriteZeroHit << 6) |
+                    (+this->spriteOverflow << 5) |
+                    this->openBus
+                );
+            }
+        } PPUSTATUS = 0xA0;
+        uint8_t OAMADDR = 0;
+        uint8_t OAMDATA = 0;
+        uint8_t PPUSCROLL = 0;
+        uint8_t PPUADDR = 0;
+        uint8_t PPUDATA = 0;
+        uint8_t OAMDMA = 0;
+        uint8_t dataBuffer = 0;
+
+        uint16_t v = 0;  // during rendering, used for scroll position; outside rendering, used as current VRAM address
+        uint16_t t = 0;  // during rendering, specifies starting coarse-x scroll for next scanline and starting y scroll for screen; outside rendering, holds scroll or VRAM before transferring it to v
+        uint8_t x = 0;  // fine-x position of current scroll, used during rendering alongside v
+        bool w = false; // write-latch for PPUSCROLL/PPUADDR; clears on read os PPUSTATUS
+
+        inline bool rendering() const { return (this->PPUMASK.enableBackground || this->PPUMASK.enableSprites); }
+        inline void triggerNMI() { this->nmiRequested = true; }
+
         uint8_t nextNametableByte = 0x00;
         uint8_t nextAttributeByte = 0x00;
-        uint8_t nextPatternLowByte = 0x00;
-        uint8_t nextPatternHighByte = 0x00;
+        uint8_t nextPatternByteLo = 0x00;
+        uint8_t nextPatternByteHi = 0x00;
 
-        // background shift registers
-        uint16_t pattShiftLo = 0x0000;
-        uint16_t pattShiftHi = 0x0000;
-        uint16_t attrShiftLo = 0x0000;
-        uint16_t attrShiftHi = 0x0000;
+        uint16_t patternShiftLo = 0x0000;
+        uint16_t patternShiftHi = 0x0000;
+        uint16_t attributeShiftLo = 0x0000;
+        uint16_t attributeShiftHi = 0x0000;
 
-        uint8_t coarseX() const {
-            return v & 0x1F;
-        }
-        uint8_t coarseY() const {
-            return (v >> 5) & 0x1F;
-        }
-        uint8_t fineY() const {
-            return (v >> 12) & 0x07;
-        }
+        inline void copyHorizontalBits() { this->v = (this->t & 0b0000010000011111); }
+        inline void copyVerticalBits()   { this->v = (this->t & 0b0111101111100000); }
+        inline uint8_t coarseX() const { return this->v & 0x1F; }
+        inline uint8_t coarseY() const { return (this->v >> 5) & 0x1F; }
+        inline uint8_t fineY() const { return (this->v >> 12) & 0x07; }
 
-        inline void shiftBackground() {
-            if (PPUMASK.enableBackground) {
-                pattShiftLo <<= 1;
-                pattShiftHi <<= 1;
+        void incrementX();
+        void incrementY();
+        void shiftBackground();
+        void loadBackgroundShifters();
+        void fetchNametableByte();
+        void fetchAttributeByte();
+        void fetchPatternLo();
+        void fetchPatternHi();
 
-                attrShiftLo <<= 1;
-                attrShiftHi <<= 1;
-            }
-        }
-        inline void loadBackgroundShifters() {
-            pattShiftLo = (pattShiftLo & 0xFF00) | nextPatternLowByte;
-            pattShiftHi = (pattShiftHi & 0xFF00) | nextPatternHighByte;
-
-            attrShiftLo = (attrShiftLo & 0xFF00) | ((nextAttributeByte & 0b01) ? 0xFF : 0x00);
-            attrShiftHi = (attrShiftHi & 0xFF00) | ((nextAttributeByte & 0b10) ? 0xFF : 0x00);
-        }
-        inline void fetchNametableByte() {
-            uint16_t addr = 0x2000 | (v & 0x0FFF);
-            ppuRead(addr, nextNametableByte);
-        }
-        inline void fetchAttributeByte() {
-            uint16_t addr = 0x23C0 |
-                (v & 0x0C00) |
-                ((v >> 4) & 0x38) |
-                ((v >> 2) & 0x07);
-            ppuRead(addr, nextAttributeByte);
-
-            if (coarseY() & 0x02) nextAttributeByte >>= 4;
-            if (coarseX() & 0x02) nextAttributeByte >>= 2;
-
-            nextAttributeByte &= 0x03;
-        }
-        inline void fetchPatternLow() {
-            uint16_t addr = bgPatternTblBaseAddr() |
-                (nextNametableByte << 4) |
-                fineY();
-            ppuRead(addr, nextPatternLowByte);
-        }
-        inline void fetchPatternHigh() {
-            uint16_t addr = bgPatternTblBaseAddr() |
-                (nextNametableByte << 4) |
-                fineY();
-            ppuRead(addr + 8, nextPatternHighByte);
-        }
-        inline void incrementX() {
-            if ((v & 0x001F) == 31) {
-                v &= ~0x001F;
-                v ^= 0x0400;
-            } else {
-                v++;
-            }
-        }
-        inline void incrementY() {
-            if ((v & 0x7000) != 0x7000) {
-                v += 0x1000;
-            } else {
-                v &= ~0x7000;
-                int8_t y = (v & 0x03E0) >> 5;
-                if (y == 29) {
-                    y = 0;
-                    v ^= 0x0800;
-                } else if (y == 31) {
-                    y = 0;
-                } else {
-                    y++;
-                }
-                v = (v & ~0x03E0) | (y << 5);
-            }
-        }
-        inline void copyHorizontalBits() { v = (v & ~0x041F) | (t & 0x041F); }
-        inline void copyVerticalBits() { v = (v & ~0x73E0) | (t & 0x73E0); }
         void renderPixel();
-
-        struct SPRITE {
-            uint8_t yCoord = 0x00;
-            uint8_t tileIndex = 0x00;
-            struct ATTR {
-                bool verticalFlip = false;
-                bool horizontalFlip = false;
-                bool priority = false;
-                uint8_t palette = 0x00;
-
-                ATTR() = default;
-
-                ATTR(uint8_t b) {
-                    verticalFlip = !!(b & 0b10000000);
-                    horizontalFlip = !!(b & 0b01000000);
-                    priority = !!(b & 0b00100000);
-                    palette = (b & 0x00000011);
-                }
-
-                ATTR& operator=(uint8_t b) {
-                    verticalFlip = !!(b & 0b10000000);
-                    horizontalFlip = !!(b & 0b01000000);
-                    priority = !!(b & 0b00100000);
-                    palette = (b & 0x00000011);
-                }
-
-                uint8_t value() const {
-                    return ((+verticalFlip << 7) |
-                            (+horizontalFlip << 6) |
-                            (+priority << 5) |
-                            (palette));
-                }
-            } attr{};
-            uint8_t xCoord = 0x00;
-        };
-        std::vector<uint8_t> primaryOAM;
-        std::vector<uint8_t> secondaryOAM;
-        void evaluateSprites();
-        void fetchSpritePatterns();
-        inline uint8_t spriteHeight() const { return 8 + (PPUCTRL.spritesAre8x16 ? 8 : 0); }
-        uint16_t getSpriteAddress(uint8_t index, uint8_t row);
-
-        struct SPRITE_RENDER_UNIT {
-            uint8_t xCounter = 0xFF;
-            uint8_t patternLo = 0x00;
-            uint8_t patternHi = 0x00;
-            uint8_t attr = 0x00;
-
-            void clear() {
-                xCounter = 0xFF;
-                patternLo = patternHi = attr = 0x00;
-            }
-
-            void set(uint8_t x, uint8_t l, uint8_t h, uint8_t a) {
-                xCounter = x;
-                patternLo = l;
-                patternHi = h;
-                attr = a;
-            }
-        };
-        SPRITE_RENDER_UNIT spriteUnits[8];
-        void reverseByte(uint8_t& b);
-        struct SPRITE_PIXEL {
-            uint8_t color = 0x00;
-            uint8_t palette = 0x00;
-            uint8_t priority = 0x00;
-            bool sprite0 = false;
-
-            SPRITE_PIXEL() {}
-
-            SPRITE_PIXEL(uint8_t c, uint8_t p, uint8_t f, bool z) {
-                color = c;
-                palette = p;
-                priority = f;
-                sprite0 = z;
-            }
-        };
-        SPRITE_PIXEL getSpritePixel();
 };

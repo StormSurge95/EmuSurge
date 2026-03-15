@@ -6,18 +6,24 @@
 NES::NES(bool d) {
     debug = d;
 
-    // initialize bus & cpu
+    // initialize bus/cpu/ppu/controllers
     bus = std::make_shared<NES_Bus>();
     cpu = std::make_shared<NES_CPU>();
+    ppu = std::make_shared<NES_PPU>();
+    controller1 = std::make_shared<NES_Controller>(1);
+    controller2 = std::make_shared<NES_Controller>(2);
 
     // connect CPU to bus
     cpu->connectBus(bus);
     bus->connectCPU(cpu);
     if (debug) cpu->enableDebug();
 
-    // PPU and map to Bus
-    ppu = std::make_shared<NES_PPU>();
+    // connect PPU to Bus
     bus->connectPPU(ppu);
+
+    // connect controllers to bus
+    bus->connectController(controller1, 1);
+    bus->connectController(controller2, 2);
 }
 
 bool NES::loadCartridge(const std::string& path) {
@@ -27,7 +33,7 @@ bool NES::loadCartridge(const std::string& path) {
     // verify cartridge
     if (cart->isValid()) {
         // map cartridge to bus
-        bus->connectMapper(cart->mapper);
+        bus->connectCartridge(cart);
         // connect cartridge to ppu
         ppu->connectCartridge(cart);
 

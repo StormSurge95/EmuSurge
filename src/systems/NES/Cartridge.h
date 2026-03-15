@@ -44,6 +44,9 @@ class Cartridge : public Device {
 
         inline MIRROR getMirror() const { return mirror; }
 
+        std::vector<uint8_t> prg() { return prgMemory; }
+        std::vector<uint8_t> chr() { return chrMemory; }
+
     private:
         bool valid = false;
 

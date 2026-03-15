@@ -1,465 +1,374 @@
+#include "Mappers/Mapper.h"
 #include "NES_PPU.h"
 
-NES_PPU::NES_PPU() {
-    primaryOAM.resize(256, 0x00);
+NES_PPU::NES_PPU() : PPUCTRL(0), PPUMASK(0), PPUSTATUS(0) {}
 
-    secondaryOAM.reserve(32);
-    secondaryOAM.clear();
-}
-
-NES_PPU::~NES_PPU() {}
-
-void NES_PPU::clock() {
-    bool rendering = PPUMASK.enableBackground || PPUMASK.enableSprites;
-
-    // VISIBLE PIXEL OUTPUT
-    if (scanline >= 0 && scanline < 240 && cycle >= 1 && cycle <= 256) {
-        renderPixel();
-    }
-
-    // BACKGROUND SHIFT REGISTERS
-    if (((cycle >= 2 && cycle <= 257) || (cycle >= 322 && cycle <= 337)))
-        shiftBackground();
-
-    // BACKGROUND TILE FETCH PIPELINE
-    if (rendering && (scanline <= 239 || scanline == 261) && ((cycle >= 1 && cycle <= 256) || (cycle >= 321 && cycle <= 336))) {
-        switch (cycle % 8) {
-            case 1:
-                loadBackgroundShifters();
-                fetchNametableByte();
-                break;
-            case 3:
-                fetchAttributeByte();
-                break;
-            case 5:
-                fetchPatternLow();
-                break;
-            case 7:
-                fetchPatternHigh();
-                break;
-            case 0:
-                incrementX();
-                break;
-            default:
-                break;
-        }
-    }
-
-    // SCROLL UPDATES
-    if (rendering) {
-        if (cycle == 256)
-            incrementY();
-        else if (cycle == 257)
-            copyHorizontalBits();
-        else if (scanline == 261 && cycle >= 280 && cycle <= 304)
-            copyVerticalBits();
-    }
-
-    // SPRITE EVALUATION
-    if (rendering && scanline >= 0 && scanline < 240) {
-        if (cycle == 65)
-            evaluateSprites();
-        else if (cycle == 257)
-            fetchSpritePatterns();
-    }
-
-    // VBLANK AND PRE-RENDER EVENTS
-    if (scanline == 241 && cycle == 1) {
-        PPUSTATUS.isInVblank = true;
-
-        if (PPUCTRL.nmi_enabled)
-            triggerNMI();
-    }
-    if (scanline == 261 && cycle == 1) {
-        PPUSTATUS.isInVblank = false;
-        PPUSTATUS.spriteZeroHit = false;
-        PPUSTATUS.spriteOverflow = false;
-    }
-
-    // CYCLE AND SCANLINE ADVANCE
-    cycle++;
-
-    if (cycle >= 341) {
-        cycle = 0;
-        scanline++;
-
-        if (scanline >= 262) {
-            scanline = 0;
-            frameComplete = true;
-
-            oddFrame = !oddFrame;
-        }
-    }
-
-    // ODD-FRAME CYCLE-SKIP
-    if (rendering && oddFrame && scanline == 261 && cycle == 339) {
-        cycle = 0;
-        scanline = 0;
-        frameComplete = true;
-        oddFrame = false;
-    }
-}
-
-void NES_PPU::reset() {}
-
-void NES_PPU::connectCartridge(std::shared_ptr<Cartridge> cart) {
-    this->cart = cart;
-    this->mapper = cart->mapper;
-}
-
+// Performs intra-device read operations on the various
+// registers that are visible to other devices for reading.
 uint8_t NES_PPU::read(uint16_t addr, bool readonly) {
     if (addr >= 0x2000 && addr <= 0x3FFF) {
         addr &= 0x0007;
 
         switch (addr) {
-            case 0x02: { // PPUSTATUS
-                uint8_t data = PPUSTATUS.value();
+            case 0x02: // PPUSTATUS
+            {
+                uint8_t ret = this->PPUSTATUS.value();
                 if (!readonly) {
-                    PPUSTATUS.isInVblank = false;
-                    w = false;
+                    this->PPUSTATUS.isInVblank = false;
+                    this->w = false;
                 }
-                return data;
+                return ret;
             }
             case 0x04: // OAMDATA
-                if (readonly) return OAMDATA;
-                return primaryOAM[OAMADDR];
-            case 0x07: { // PPUDATA
-                uint8_t result;
+                if (this->PPUSTATUS.isInVblank)
+                    return this->primaryOAM[OAMADDR];
+                return this->OAMDATA;
+            case 0x07: // PPUDATA
+            {
+                uint8_t ret = 0x00;
 
-                // read actual VRAM
-                uint8_t data = ppuRead(v);
+                uint8_t data = ppuRead(this->v);
 
-                // palette memory is not buffered
-                if (v >= 0x3F00 && v <= 0x3FFF) {
-                    result = data;
-                    dataBuffer = data;
+                if (this->v >= 0x3F00 && this->v <= 0x3FFF) {
+                    ret = data;
+                    this->dataBuffer = data;
                 } else {
-                    result = dataBuffer;
-                    dataBuffer = data;
+                    ret = this->dataBuffer;
+                    this->dataBuffer = data;
                 }
 
-                // increment VRAM address
-                if (PPUCTRL.incrementBy32)
-                    v += 32;
-                else
-                    v++;
+                this->v += this->PPUCTRL.incrementMode();
 
-                return result;
+                return ret;
             }
         }
     }
 
-    return 0;
+    return 0x00;
 }
 
+// Performs intra-device write operations on the various
+// registers that are visible to other devices for writing.
 void NES_PPU::write(uint16_t addr, uint8_t data) {
     if (addr >= 0x2000 && addr <= 0x3FFF) {
         addr &= 0x0007;
 
         switch (addr) {
             case 0x00: // PPUCTRL
-                PPUCTRL = data;
-                t = (t & 0xF3FF) | ((uint16_t)(data & 0x03) << 10);
-                break;
+                this->PPUCTRL = data;
+                this->t = ((this->t & 0xF3FF) | ((uint16_t)(data & 0x03) << 10));
+                return;
             case 0x01: // PPUMASK
-                PPUMASK = data;
-                break;
+                this->PPUMASK = data;
+                return;
             case 0x03: // OAMADDR
-                OAMADDR = data;
-                break;
+                this->OAMADDR = data;
+                return;
             case 0x04: // OAMDATA
-                OAMDATA = data;
-                primaryOAM[OAMADDR] = OAMDATA;
-                OAMADDR++;
-                break;
+                this->OAMDATA = data;
+                this->primaryOAM[OAMADDR] = this->OAMDATA;
+                this->OAMADDR++;
+                return;
             case 0x05: // PPUSCROLL
-                PPUSCROLL = data;
-                if (!w) {
-                    // first write; horizontal scroll (coarse x)
-                    fine_x = data & 0x07;
+                this->PPUSCROLL = data;
+                if (!this->w) { // first write
+                    this->x = (data & 0x07);
 
-                    t &= ~0x001F;
-                    t |= (uint16_t)(data >> 3) & 0x1F;
+                    this->t &= ~0x001F;
+                    this->t |= ((uint16_t)(data >> 3) & 0x1F);
 
-                    w = true;
-                } else {
-                    // second write; vertical scroll (coarse y)
-                    t &= 0x73E0;
+                    this->w = true;
+                } else { // second write
+                    this->t &= 0x73E0;
 
-                    t |= (uint16_t)(data & 0x07) << 12;
-                    t |= (uint16_t)(data & 0xF8) << 2;
+                    this->t |= ((uint16_t)(data & 0x07) << 12);
+                    this->t |= ((uint16_t)(data & 0xF8) << 2);
 
-                    w = false;
+                    this->w = false;
                 }
-                break;
+                return;
             case 0x06: // PPUADDR
-                if (!w) {
-                    //vramAddr = (data << 8) | (vramAddr & 0x00FF);
-                    // first write; high byte of address
-                    t &= 0x00FF;
-                    t |= (uint16_t)(data & 0x3F) << 8;
+                if (!this->w) { // first write
+                    this->t &= 0x00FF;
+                    this->t |= ((uint16_t)(data & 0x3F) << 8);
 
-                    w = true;
-                } else {
-                    // second write; low byte of address
-                    t &= 0x7F00;
-                    t |= (uint16_t)data;
+                    this->w = true;
+                } else { // second write
+                    this->t &= 0x7F00;
+                    this->t |= ((uint16_t)data);
 
-                    v = t; // transfer address from t to v
+                    this->v = this->t;
 
-                    w = false;
+                    this->w = false;
                 }
-                break;
-            case 0x07: // PPU DATA
-                ppuWrite(v, data);
-                if (PPUCTRL.incrementBy32) {
-                    //vramAddr += 32;
-                    v += 32;
-                } else {
-                    //vramAddr += 1;
-                    v++;
-                }
-                break;
+                return;
+            case 0x07: // PPUDATA
+                this->PPUDATA = data;
+                this->ppuWrite(this->v, this->PPUDATA);
+                this->v += this->PPUCTRL.incrementMode();
+                return;
         }
     }
 }
 
-// reads from video RAM and/or mapper-mapped address via mapper->ppuRead()
+// Performs read operations by reading from VRAM on
+// the PPU and/or CHR-ROM/CHR-RAM on the cartridge.
 uint8_t NES_PPU::ppuRead(uint16_t addr, bool readonly) {
-    addr &= 0x3FFF;
-
-    if (addr >= 0x0000 && addr <= 0x1FFF) {
-        return mapper->ppuRead(addr, readonly);
-    } else if (addr >= 0x2000 && addr <= 0x3EFF) {
+    if (addr >= 0x0000 && addr <= 0x1FFF)
+        return this->cart->mapper->ppuRead(addr, readonly);
+    else if (addr >= 0x2000 && addr <= 0x3EFF) {
         addr &= 0x0FFF;
         uint16_t A = addr & 0x03FF;
-        uint16_t B = (addr & 0x03FF) + 0x0400;
+        uint16_t B = A + 0x0400;
         if (cart->getMirror() == Cartridge::VERTICAL) {
             if (addr <= 0x03FF) return nametables[A];
-            else if (addr <= 0x07FF) return nametables[B];
-            else if (addr <= 0x0BFF) return nametables[A];
-            else return nametables[B];
-        } else {
-            if (addr <= 0x03FF) return nametables[A];
-            else if (addr <= 0x07FF) return nametables[A];
-            else if (addr <= 0x0BFF) return nametables[B];
-            else return nametables[B];
+            if (addr <= 0x07FF) return nametables[B];
+            if (addr <= 0x0BFF) return nametables[A];
+            return nametables[B];
+        } else if (cart->getMirror() == Cartridge::HORIZONTAL) {
+            if (addr <= 0x07FF) return nametables[A];
+            return nametables[B];
         }
-    } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
-        addr &= 0x001F;
+    } else if (addr <= 0x3FFF) {
+        addr &= 0x1F;
         if (addr == 0x10) addr = 0x00;
         else if (addr == 0x14) addr = 0x04;
         else if (addr == 0x18) addr = 0x08;
         else if (addr == 0x1C) addr = 0x0C;
-        return paletteRam[addr];
+        return palettes[addr];
     }
 
     return 0x00;
 }
 
+// Performs write operations by writing to VRAM on
+// the PPU and/or CHR-ROM/CHR-RAM on the cartridge.
 void NES_PPU::ppuWrite(uint16_t addr, uint8_t data) {
-    addr &= 0x3FFF;
-
-    if (addr >= 0x0000 && addr <= 0x1FFF) {
-        mapper->ppuWrite(addr, data);
-    } else if (addr >= 0x2000 && addr <= 0x3EFF) {
+    if (addr >= 0x0000 && addr <= 0x1FFF)
+        this->cart->mapper->ppuWrite(addr, data);
+    else if (addr >= 0x2000 && addr <= 0x3EFF) {
         addr &= 0x0FFF;
-
         uint16_t A = addr & 0x03FF;
-        uint16_t B = (addr & 0x03FF) + 0x0400;
+        uint16_t B = A + 0x0400;
         if (cart->getMirror() == Cartridge::VERTICAL) {
-            if (addr <= 0x03FF) nametables[A] = data;
-            else if (addr <= 0x07FF) nametables[B] = data;
-            else if (addr <= 0x0BFF) nametables[A] = data;
-            else nametables[B] = data;
-        } else {
-            if (addr <= 0x03FF) nametables[A] = data;
-            else if (addr <= 0x07FF) nametables[A] = data;
-            else if (addr <= 0x0BFF) nametables[B] = data;
-            else nametables[B] = data;
+            if (addr <= 0x03FF) {
+                nametables[A] = data;
+                return;
+            }
+            if (addr <= 0x07FF) {
+                nametables[B] = data;
+                return;
+            }
+            if (addr <= 0x0BFF) {
+                nametables[A] = data;
+                return;
+            }
+            nametables[B] = data;
+            return;
+        } else if (cart->getMirror() == Cartridge::HORIZONTAL) {
+            if (addr <= 0x07FF) {
+                nametables[A] = data;
+                return;
+            }
+            nametables[B] = data;
+            return;
         }
-    } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
-        addr &= 0x001F;
+    } else if (addr <= 0x3FFF) {
+        addr &= 0x1F;
         if (addr == 0x10) addr = 0x00;
         else if (addr == 0x14) addr = 0x04;
         else if (addr == 0x18) addr = 0x08;
         else if (addr == 0x1C) addr = 0x0C;
-        paletteRam[addr] = data;
+        palettes[addr] = data;
     }
 }
 
-const uint32_t* NES_PPU::getFrameBuffer() const {
-    return frameBuffer.data();
-}
+void NES_PPU::clock() {
+    // OUTPUT PROCESSED VISIBLE PIXEL
+    if (this->scanline >= 0 && this->scanline <= 239 && this->cycle >= 1 && this->cycle <= 256) {
+        this->renderPixel();
+    }
 
-void NES_PPU::evaluateSprites() {
-    if (primaryOAM.size() < 256) return;
+    // SHIFT BACKGROUND REGISTERS
+    if (((this->cycle >= 2 && this->cycle <= 257) || (this->cycle >= 322 && this->cycle <= 337))) {
+        this->shiftBackground();
+    }
 
-    secondaryOAM.clear();
-
-    for (int s = 0; s < 64; s++) {
-        int base = s * 4;
-
-        uint8_t top = primaryOAM[base] + 1;
-
-        if (scanline >= top && scanline < (top + spriteHeight())) {
-            if (secondaryOAM.size() < 32) {
-                secondaryOAM.insert(secondaryOAM.end(), {
-                    primaryOAM[base],
-                    primaryOAM[base + 1],
-                    primaryOAM[base + 2],
-                    primaryOAM[base + 3] });
-            } else {
-                PPUSTATUS.spriteOverflow = true;
+    // FETCH BACKGROUND TILE DATA
+    if (this->rendering() && (this->scanline <= 239 || this->scanline == 261) && ((this->cycle >= 1 && this->cycle <= 256) || (this->cycle >= 321 && this->cycle <= 336))) {
+        switch (this->cycle % 8) { // 0 - 7
+            case 1:
+                this->loadBackgroundShifters();
+                this->fetchNametableByte();
                 break;
-            }
+            case 3:
+                this->fetchAttributeByte();
+                break;
+            case 5:
+                this->fetchPatternLo();
+                break;
+            case 7:
+                this->fetchPatternHi();
+                break;
+            case 0:
+                this->incrementX();
+                break;
+            default:
+                break;
+
         }
     }
+
+    // SCROLL UPDATES
+    if (this->rendering()) {
+        if (cycle == 256) this->incrementY();
+        else if (cycle == 257) this->copyHorizontalBits();
+        else if (scanline == 261 && cycle >= 280 && cycle <= 304) this->copyVerticalBits();
+    }
+
+    // SPRITE EVALUATION
+    if (this->rendering() && this->scanline >= 0 && this->scanline < 240) {
+        // TODO
+    }
+
+    // VBLANK EVENT
+    if (this->scanline == 241 && this->cycle == 1) {
+        this->PPUSTATUS.isInVblank = true;
+        if (this->PPUCTRL.nmiEnabled) {
+            this->triggerNMI();
+        }
+    }
+
+    // PRE-RENDER EVENT
+    if (this->scanline == 261 && this->cycle == 1) {
+        this->PPUSTATUS.isInVblank = false;
+        this->PPUSTATUS.spriteOverflow = false;
+        this->PPUSTATUS.spriteZeroHit = false;
+    }
+
+    // CYCLE & SCANLINE ADVANCE
+    this->cycle++;
+
+    if (this->cycle >= 341) {
+        this->cycle = 0;
+        this->scanline++;
+
+        if (this->scanline >= 262) {
+            this->scanline = 0;
+            this->frameComplete = true;
+            this->oddFrame = !this->oddFrame;
+        }
+    }
+
+    // ODD-FRAME CYCLE-SKIP
+    if (this->rendering() && this->oddFrame && this->scanline == 261 && this->cycle == 339) {
+        this->cycle = 0;
+        this->scanline = 0;
+        this->frameComplete = true;
+        this->oddFrame = false;
+    }
+}
+
+void NES_PPU::incrementX() {
+    if ((this->v & 0x001F) == 31) {
+        this->v &= ~0x001F;
+        this->v ^= 0x0400;
+    } else {
+        this->v++;
+    }
+}
+
+void NES_PPU::incrementY() {
+    if ((this->v & 0x7000) != 0x7000) {
+        v += 0x1000;
+    } else {
+        this->v &= ~0x7000;
+        int8_t y = this->coarseY();
+        if (y == 29) {
+            y = 0;
+            y ^= 0x0800;
+        } else if (y == 31) {
+            y = 0;
+        } else {
+            y++;
+        }
+        this->v = (this->v & ~0x03E0) | ((uint16_t)y << 5);
+    }
+}
+
+void NES_PPU::shiftBackground() {
+    if (this->PPUMASK.enableBackground) {
+        patternShiftLo <<= 1;
+        patternShiftHi <<= 1;
+
+        attributeShiftLo <<= 1;
+        attributeShiftHi <<= 1;
+    }
+}
+
+void NES_PPU::loadBackgroundShifters() {
+    this->patternShiftLo = (this->patternShiftLo & 0xFF00) | this->nextPatternByteLo;
+    this->patternShiftHi = (this->patternShiftHi & 0xFF00) | this->nextPatternByteHi;
+
+    this->attributeShiftLo = (this->attributeShiftLo & 0xFF00) | ((this->nextAttributeByte & 0b01) ? 0xFF : 0x00);
+    this->attributeShiftHi = (this->attributeShiftHi & 0xFF00) | ((this->nextAttributeByte & 0b10) ? 0xFF : 0x00);
+}
+
+void NES_PPU::fetchNametableByte() {
+    uint16_t addr = (0x2000 | (this->v & 0x0FFF));
+    this->nextNametableByte = this->ppuRead(addr, false);
+}
+
+void NES_PPU::fetchAttributeByte() {
+    uint16_t addr = 0x23C0 |
+        (this->v & 0x0C00) |
+        ((this->v >> 4) & 0x38) |
+        ((this->v >> 2) & 0x07);
+    this->nextAttributeByte = this->ppuRead(addr, false);
+
+    if (this->coarseY() & 0x02) this->nextAttributeByte >>= 4;
+    if (this->coarseX() & 0x02) this->nextAttributeByte >>= 2;
+
+    this->nextAttributeByte &= 0x03;
+}
+
+void NES_PPU::fetchPatternLo() {
+    uint16_t addr = this->PPUCTRL.backgroundPatternSelect() |
+        (((uint16_t)this->nextNametableByte) << 4) |
+        ((uint16_t)this->fineY());
+    this->nextPatternByteLo = this->ppuRead(addr, false);
+}
+
+void NES_PPU::fetchPatternHi() {
+    uint16_t addr = this->PPUCTRL.backgroundPatternSelect() |
+        (((uint16_t)this->nextNametableByte) << 4) |
+        ((uint16_t)this->fineY());
+    this->nextPatternByteHi = this->ppuRead(addr + 8, false);
 }
 
 void NES_PPU::renderPixel() {
-    uint16_t mux = 0x8000 >> fine_x;
+    uint16_t mux = 0x8000 >> this->x;
 
-    uint8_t p0 = (pattShiftLo & mux) > 0;
-    uint8_t p1 = (pattShiftHi & mux) > 0;
+    uint8_t p0 = (this->patternShiftLo & mux) > 0;
+    uint8_t p1 = (this->patternShiftHi & mux) > 0;
 
-    uint8_t pixel = (p1 << 1) | p0;
+    uint8_t pixel = (p1 < 1) | p0;
 
-    uint8_t a0 = (attrShiftLo & mux) > 0;
-    uint8_t a1 = (attrShiftHi & mux) > 0;
+    uint8_t a0 = (this->attributeShiftLo & mux) > 0;
+    uint8_t a1 = (this->attributeShiftHi & mux) > 0;
 
     uint8_t attr = (a1 << 1) | a0;
 
-    if (!PPUMASK.enableBackground) {
+    if (!this->PPUMASK.enableBackground) {
         pixel = 0;
         attr = 0;
     }
 
-    SPRITE_PIXEL spr = getSpritePixel();
-
-    bool bgTrans = pixel == 0;
-    bool sprTrans = spr.color == 0;
-
-    if (spr.sprite0 && !bgTrans && !sprTrans)
-        PPUSTATUS.spriteZeroHit = true;
-
-    uint8_t finalPixel;
-    uint8_t finalPalette;
-
-    if (bgTrans && sprTrans) {
-        finalPixel = 0x00;
-        finalPalette = 0x00;
-    } else if (bgTrans) {
-        finalPixel = spr.color;
-        finalPalette = 4 + spr.palette;
-    } else if (sprTrans) {
-        finalPixel = pixel;
-        finalPalette = attr;
-    } else if (spr.priority == 0) {
-        finalPixel = spr.color;
-        finalPalette = 4 + spr.palette;
-    } else {
-        finalPixel = pixel;
-        finalPalette = attr;
-    }
-
     uint16_t paletteAddr = 0x3F00;
 
-    if (finalPixel != 0) paletteAddr += (finalPalette << 2) + finalPixel;
+    if (pixel != 0) paletteAddr += ((attr << 2) + pixel);
 
-    uint8_t index = 0;
-    ppuRead(paletteAddr, index);
+    uint8_t index = this->ppuRead(paletteAddr, false);
 
-    frameBuffer[(size_t)scanline * 256 + ((size_t)cycle - 1)] = masterPalette[index & 0x3F];
-}
-
-bool NES_PPU::writeDMAByte(uint8_t data) {
-    primaryOAM[OAMADDR++] = data;
-    return OAMADDR == 0;
-}
-
-void NES_PPU::fetchSpritePatterns() {
-    uint8_t h = spriteHeight();
-
-    for (int i = 0; i < 8; i++) {
-        spriteUnits[i].clear();
-    }
-
-    for (uint8_t i = 0; i < secondaryOAM.size(); i += 4) {
-        uint8_t unitIndex = i / 4;
-
-        SPRITE s;
-        s.yCoord = secondaryOAM[i];
-        s.tileIndex = secondaryOAM[(size_t)i + 1];
-        s.attr = SPRITE::ATTR(secondaryOAM[i + 2]);
-        s.xCoord = secondaryOAM[(size_t)i + 3];
-
-        uint8_t row = scanline - (s.yCoord + 1);
-
-        if (s.attr.verticalFlip)
-            row = h - 1 - row;
-
-        uint16_t addr = getSpriteAddress(s.tileIndex, (row & (spriteHeight() - 1)));
-
-        uint8_t p0 = ppuRead(addr);
-        uint8_t p1 = ppuRead(addr + 8);
-
-        if (s.attr.horizontalFlip) {
-            reverseByte(p0);
-            reverseByte(p1);
-        }
-
-        spriteUnits[unitIndex].set(s.xCoord, p0, p1, s.attr.value());
-    }
-}
-
-uint16_t NES_PPU::getSpriteAddress(uint8_t index, uint8_t row) {
-    if (PPUCTRL.spritesAre8x16) {
-        uint16_t table = (index & 1) * 0x1000;
-        uint16_t tile = (index & 0xFE);
-
-        if (row >= 8) {
-            tile++;
-            row -= 8;
-        }
-
-        return table + tile * 16 + row;
-    } else {
-        uint16_t tileAddr = spritePatternTableBaseAddr() + index * 16;
-        return tileAddr + (row & 0x07);
-    }
-}
-
-NES_PPU::SPRITE_PIXEL NES_PPU::getSpritePixel() {
-    for (uint8_t i = 0; i < 8; i++) {
-        SPRITE_RENDER_UNIT* u = &spriteUnits[i];
-
-        if (u->xCounter > 0) {
-            u->xCounter--;
-            continue;
-        }
-
-        uint8_t b0 = (u->patternLo >> 7) & 1;
-        uint8_t b1 = (u->patternHi >> 7) & 1;
-
-        u->patternLo <<= 1;
-        u->patternHi <<= 1;
-
-        uint8_t c = (b1 << 1) | b0;
-
-        if (c == 0) continue;
-
-        uint8_t p = (u->attr >> 2) & 3;
-        uint8_t f = (u->attr >> 5) & 1;
-
-        return SPRITE_PIXEL(c, p, f, i == 0);
-    }
-
-    return SPRITE_PIXEL();
-}
-
-void NES_PPU::reverseByte(uint8_t& b) {
-    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-    b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+    this->frameBuffer[(size_t)this->scanline * 256 + ((size_t)this->cycle - 1)] = this->masterPalette[index & 0x3F];
 }

@@ -70,8 +70,6 @@ void NES_CPU::reset() {
 
     pc = (hi << 8) | lo;
 
-    pc = 0xC000;
-
     addrRel = 0;
     addrAbs = 0;
     fetched = 0;

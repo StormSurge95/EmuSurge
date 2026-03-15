@@ -13,6 +13,7 @@
 class NES : public IConsole {
     public:
         std::shared_ptr<NES_CPU> cpu;
+        uint64_t systemClockCounter = 0;
         bool debug = false;
 
         NES(bool debug = false);
@@ -33,5 +34,4 @@ class NES : public IConsole {
         std::shared_ptr<NES_PPU> ppu;
         std::shared_ptr<NES_Controller> controller1;
         std::shared_ptr<NES_Controller> controller2;
-        uint64_t systemClockCounter = 0;
 };
