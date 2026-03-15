@@ -9,7 +9,7 @@ NES_Bus::NES_Bus() : ram{} {}
 
 uint8_t NES_Bus::read(uint16_t addr, bool readonly) {
     if (addr >= 0x0000 && addr <= 0x07FF) {
-        return this->ram[addr % 0x07FF];
+        return this->ram[addr % 0x0800];
     } else if (addr >= 0x2000 && addr <= 0x3FFF) {
         return this->ppu->read(addr, readonly);
     } else if (addr >= 0x4000 && addr <= 0x4015) {

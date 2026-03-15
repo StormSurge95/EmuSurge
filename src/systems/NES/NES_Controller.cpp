@@ -22,7 +22,3 @@ void NES_Controller::onWrite(uint8_t data) {
         this->other->cursor = 0;
     }
 }
-
-void NES_Controller::update(NES_BUTTONS button, bool isPressed) {
-    this->buttons[button] = isPressed;
-}

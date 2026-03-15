@@ -80,15 +80,13 @@ const uint32_t* NES::getFrameBuffer() const {
 
 void NES::update(uint8_t player, std::array<bool, 8> buttons) {
     std::shared_ptr<NES_Controller> c;
-    if (player == 1) c = this->controller1;
-    else if (player == 2) c = this->controller2;
-
-    c->update(BUTTON_A, buttons[0]);
-    c->update(BUTTON_B, buttons[1]);
-    c->update(BUTTON_SELECT, buttons[2]);
-    c->update(BUTTON_START, buttons[3]);
-    c->update(BUTTON_UP, buttons[4]);
-    c->update(BUTTON_DOWN, buttons[5]);
-    c->update(BUTTON_LEFT, buttons[6]);
-    c->update(BUTTON_RIGHT, buttons[7]);
+    if (player == 1) {
+        for (int x = 0; x < 8; x++) {
+            this->controller1->update((NES_BUTTONS)x, buttons[x]);
+        }
+    } else if (player == 2) {
+        for (int x = 0; x < 8; x++) {
+            this->controller2->update((NES_BUTTONS)x, buttons[x]);
+        }
+    }
 }

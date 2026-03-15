@@ -25,7 +25,8 @@ class NES_Controller : public IODevice {
 
         uint8_t onRead() override;
         void onWrite(uint8_t data) override;
-        void update(NES_BUTTONS button, bool isPressed);
+
+        inline void update(NES_BUTTONS button, bool isPressed) { this->buttons[button] = isPressed; }
 
     private:
         bool buttons[8] = { false, false, false, false, false, false, false, false };

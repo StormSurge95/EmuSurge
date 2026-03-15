@@ -2,6 +2,39 @@
 
 #include "./systems/NES/NES.h"
 
+static std::array<bool, 8> getButtons(SDL_Gamepad* gp) {
+    std::array<bool, 8> buttons = {false, false, false, false, false, false, false, false};
+
+    if (gp) {
+        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_SOUTH)) {
+            buttons[0] = true; // A
+        }
+        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_EAST)) {
+            buttons[1] = true; // B
+        }
+        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_BACK)) {
+            buttons[2] = true; // Select
+        }
+        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_START)) {
+            buttons[3] = true;
+        }
+        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_DPAD_UP)) {
+            buttons[4] = true;
+        }
+        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_DPAD_DOWN)) {
+            buttons[5] = true;
+        }
+        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_DPAD_LEFT)) {
+            buttons[6] = true;
+        }
+        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_DPAD_RIGHT)) {
+            buttons[7] = true;
+        }
+    }
+
+    return buttons;
+}
+
 int main(int argc, int* argv[]) {
     NES* nes = new NES();
     if (!nes->loadCartridge("C:/roms/NES/Tests/nestest.nes")) return 1;
@@ -32,10 +65,16 @@ int main(int argc, int* argv[]) {
                         if (e.type == SDL_EVENT_QUIT)
                             quit = true;
                         else if (e.type == SDL_EVENT_GAMEPAD_ADDED) {
-                            if (gamepad1 == nullptr) gamepad1 = SDL_OpenGamepad(e.gdevice.which);
-                            else gamepad2 = SDL_OpenGamepad(e.gdevice.which);
+                            if (gamepad1 == nullptr) {
+                                printf("SETTING GAMEPAD #1\n");
+                                gamepad1 = SDL_OpenGamepad(e.gdevice.which);
+                            } else {
+                                printf("SETTING GAMEPAD #2\n");
+                                gamepad2 = SDL_OpenGamepad(e.gdevice.which);
+                            }
                         } else if (e.type == SDL_EVENT_GAMEPAD_REMOVED) {
                             if (gamepad1 && SDL_GetGamepadID(gamepad1) == e.gdevice.which) {
+                                printf("REMOVING GAMEPAD 1\n");
                                 SDL_CloseGamepad(gamepad1);
                                 gamepad1 = gamepad2;
                                 gamepad2 = nullptr;
@@ -43,6 +82,11 @@ int main(int argc, int* argv[]) {
                                 SDL_CloseGamepad(gamepad2);
                                 gamepad2 = nullptr;
                             }
+                        } else if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
+                            if (e.gbutton.which == SDL_GetGamepadID(gamepad1))
+                                nes->update(1, getButtons(gamepad1));
+                            else if (e.gbutton.which == SDL_GetGamepadID(gamepad2))
+                                nes->update(2, getButtons(gamepad2));
                         }
                     }
 
@@ -69,29 +113,4 @@ int main(int argc, int* argv[]) {
     }
 
     return 0;
-}
-
-static uint8_t getButtons(SDL_Gamepad* gp) {
-    uint8_t buttons = 0;
-
-    if (gp) {
-        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_SOUTH))
-            buttons |= 1 << 0; // A
-        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_EAST))
-            buttons |= 1 << 1; // B
-        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_BACK))
-            buttons |= 1 << 2; // Select
-        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_START))
-            buttons |= 1 << 3;
-        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_DPAD_UP))
-            buttons |= 1 << 4;
-        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_DPAD_DOWN))
-            buttons |= 1 << 5;
-        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_DPAD_LEFT))
-            buttons |= 1 << 6;
-        if (SDL_GetGamepadButton(gp, SDL_GAMEPAD_BUTTON_DPAD_RIGHT))
-            buttons |= 1 << 7;
-    }
-
-    return buttons;
 }
