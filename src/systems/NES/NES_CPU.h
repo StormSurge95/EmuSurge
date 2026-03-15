@@ -79,8 +79,11 @@ class NES_CPU : public Device {
         }
 
         #pragma region Addressing Modes
-        inline uint8_t IMP() {
+        inline uint8_t ACC() {
             fetched = a;
+            return 0;
+        }
+        inline uint8_t IMP() {
             return 0;
         }
         inline uint8_t IMM() {
@@ -132,9 +135,7 @@ class NES_CPU : public Device {
             uint16_t phi = read(pc++);
             uint16_t ptr = (phi << 8) | plo;
             uint16_t lo = read(ptr);
-            uint16_t hi = read(ptr + 1);
-            if (plo == 0x00FF)
-                hi = read(ptr & 0xFF00);
+            uint16_t hi = read((ptr & 0xFF00) | ((ptr + 1) & 0x00FF));
             addrAbs = (hi << 8) | lo;
             return 0;
         }
@@ -612,9 +613,7 @@ class NES_CPU : public Device {
             push((pc >> 8) & 0xFF);
             push(pc & 0xFF);
 
-            setFlag(B, 1);
-            push(status);
-            setFlag(B, 0);
+            push(status | B | U);
 
             uint16_t lo = read(0xFFFE);
             uint16_t hi = read(0xFFFF);
@@ -648,7 +647,7 @@ class NES_CPU : public Device {
             return 0;
         }
         inline uint8_t PHP() {
-            push(status | 0x10);
+            push(status | B | U);
             return 0;
         }
         inline uint8_t PLP() {
@@ -707,8 +706,9 @@ class NES_CPU : public Device {
         }
         #pragma endregion
         inline uint8_t XXX() {
-            std::string msg = "ILLEGAL OPCODE ATTEMPTED: " + hex(opcode, 2);
-            throw std::exception(msg.c_str());
+            //std::string msg = "ILLEGAL OPCODE ATTEMPTED: " + hex(opcode, 2);
+            //throw std::exception(msg.c_str());
+            return this->NOP();
         }
 #pragma endregion
         #pragma region Debugging

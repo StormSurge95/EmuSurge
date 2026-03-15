@@ -205,8 +205,8 @@ class NES_PPU : public Device {
         uint16_t attributeShiftLo = 0x0000;
         uint16_t attributeShiftHi = 0x0000;
 
-        inline void copyHorizontalBits() { this->v = (this->t & 0b0000010000011111); }
-        inline void copyVerticalBits()   { this->v = (this->t & 0b0111101111100000); }
+        inline void copyHorizontalBits() { this->v = (this->v & ~0b0000010000011111) | (this->t & 0b0000010000011111); }
+        inline void copyVerticalBits()   { this->v = (this->v & ~0b0111101111100000) | (this->t & 0b0111101111100000); }
         inline uint8_t coarseX() const { return this->v & 0x1F; }
         inline uint8_t coarseY() const { return (this->v >> 5) & 0x1F; }
         inline uint8_t fineY() const { return (this->v >> 12) & 0x07; }

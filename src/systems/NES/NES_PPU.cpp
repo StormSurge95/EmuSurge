@@ -352,7 +352,7 @@ void NES_PPU::renderPixel() {
     uint8_t p0 = (this->patternShiftLo & mux) > 0;
     uint8_t p1 = (this->patternShiftHi & mux) > 0;
 
-    uint8_t pixel = (p1 < 1) | p0;
+    uint8_t pixel = (p1 << 1) | p0;
 
     uint8_t a0 = (this->attributeShiftLo & mux) > 0;
     uint8_t a1 = (this->attributeShiftHi & mux) > 0;

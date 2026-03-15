@@ -8,6 +8,7 @@
 #include "NES_CPU.h"
 #include "NES_PPU.h"
 
+#include <array>
 #include <memory>
 
 class NES : public IConsole {
@@ -26,6 +27,8 @@ class NES : public IConsole {
         const uint32_t* getFrameBuffer() const override;
         int getScreenWidth() const override { return 256; }
         int getScreenHeight() const override { return 240; }
+
+        void update(uint8_t player, std::array<bool, 8> buttons);
 
     private:
         std::shared_ptr<NES_Bus> bus;

@@ -1,6 +1,7 @@
 #include "NES.h"
 #include "NES_Bus.h"
 
+#include <array>
 #include <memory>
 
 NES::NES(bool d) {
@@ -75,4 +76,19 @@ void NES::clock() {
 
 const uint32_t* NES::getFrameBuffer() const {
     return ppu->getFrameBuffer();
+}
+
+void NES::update(uint8_t player, std::array<bool, 8> buttons) {
+    std::shared_ptr<NES_Controller> c;
+    if (player == 1) c = this->controller1;
+    else if (player == 2) c = this->controller2;
+
+    c->update(BUTTON_A, buttons[0]);
+    c->update(BUTTON_B, buttons[1]);
+    c->update(BUTTON_SELECT, buttons[2]);
+    c->update(BUTTON_START, buttons[3]);
+    c->update(BUTTON_UP, buttons[4]);
+    c->update(BUTTON_DOWN, buttons[5]);
+    c->update(BUTTON_LEFT, buttons[6]);
+    c->update(BUTTON_RIGHT, buttons[7]);
 }

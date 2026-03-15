@@ -51,7 +51,7 @@ void NES_CPU::write(uint16_t addr, uint8_t data) {
 }
 
 uint8_t NES_CPU::fetch() {
-    if (!(lookup[opcode].addrmode == &NES_CPU::IMP))
+    if (lookup[opcode].addrmode != &NES_CPU::IMP)
         fetched = read(addrAbs);
 
     return fetched;
@@ -232,11 +232,11 @@ void NES_CPU::IRQ() {
 void NES_CPU::NMI() {
     push((pc & 0xFF00) >> 8);
     push(pc & 0x00FF);
-    push(status);
+    push(status & ~B);
     setFlag(I, true);
     uint16_t lo = read(0xFFFA);
     uint16_t hi = read(0xFFFB);
     uint16_t addr = (hi << 8) | lo;
     pc = addr;
-    cycles += 7;
+    cycles = 7;
 }
