@@ -40,7 +40,7 @@ void NES_Bus::write(uint16_t addr, uint8_t data) {
         // APU Status register
     } else if (addr == 0x4016) {
         return this->controller1->onWrite(data);
-    } else if (addr >= 4017 && addr <= 4019) {
+    } else if (addr >= 0x4017 && addr <= 0x4019) {
         // APU Frame Counter
     } else if (addr >= 0x4020 && addr <= 0xFFFF) {
         return this->cart->write(addr, data);

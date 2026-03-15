@@ -1,5 +1,6 @@
 #include "../../core/Helpers.h"
 #include "NES_CPU.h"
+#include "NES_PPU.h"
 
 #include <sstream>
 #include <vector>
@@ -8,19 +9,19 @@ NES_CPU::NES_CPU() {
     using a = NES_CPU;
     lookup = {
         /*0x00                           0x01                           0x02                           0x03                          0x04                           0x05                           0x06                           0x07                          0x08                           0x09                           0x0A                           0x0B                           0x0C                           0x0D                           0x0E                           0x0F*/
-        { "BRK",&a::BRK,&a::IMM,7,2 }, { "ORA",&a::ORA,&a::IZX,6,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "NOP",&a::NOP,&a::ZP0,3,2 }, { "ORA",&a::ORA,&a::ZP0,3,2 }, { "ASL",&a::ASL,&a::ZP0,5,2 }, { "???",&a::XXX,&a::IMP,5,1 },{ "PHP",&a::PHP,&a::IMP,3,1 }, { "ORA",&a::ORA,&a::IMM,2,2 }, { "ASL",&a::ASL,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,2,1 }, { "NOP",&a::NOP,&a::ABS,4,3 }, { "ORA",&a::ORA,&a::ABS,4,3 }, { "ASL",&a::ASL,&a::ABS,6,3 }, { "???",&a::XXX,&a::IMP,6,1 },
+        { "BRK",&a::BRK,&a::IMM,7,2 }, { "ORA",&a::ORA,&a::IZX,6,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "NOP",&a::NOP,&a::ZP0,3,2 }, { "ORA",&a::ORA,&a::ZP0,3,2 }, { "ASL",&a::ASL,&a::ZP0,5,2 }, { "???",&a::XXX,&a::IMP,5,1 },{ "PHP",&a::PHP,&a::IMP,3,1 }, { "ORA",&a::ORA,&a::IMM,2,2 }, { "ASL",&a::ASL,&a::ACC,2,1 }, { "???",&a::XXX,&a::IMP,2,1 }, { "NOP",&a::NOP,&a::ABS,4,3 }, { "ORA",&a::ORA,&a::ABS,4,3 }, { "ASL",&a::ASL,&a::ABS,6,3 }, { "???",&a::XXX,&a::IMP,6,1 },
         /*0x10                           0x11                           0x12                           0x13                          0x14                           0x15                           0x16                           0x17                          0x18                           0x19                           0x1A                           0x1B                           0x1C                           0x1D                           0x1E                           0x1F*/
         { "BPL",&a::BPL,&a::REL,2,2 }, { "ORA",&a::ORA,&a::IZY,5,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "NOP",&a::NOP,&a::ZPX,4,2 }, { "ORA",&a::ORA,&a::ZPX,4,2 }, { "ASL",&a::ASL,&a::ZPX,6,2 }, { "???",&a::XXX,&a::IMP,6,1 },{ "CLC",&a::CLC,&a::IMP,2,1 }, { "ORA",&a::ORA,&a::ABY,4,3 }, { "NOP",&a::NOP,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,7,1 }, { "NOP",&a::NOP,&a::ABX,4,3 }, { "ORA",&a::ORA,&a::ABX,4,3 }, { "ASL",&a::ASL,&a::ABX,7,3 }, { "???",&a::XXX,&a::IMP,7,1 },
         /*0x20                           0x21                           0x22                           0x23                          0x24                           0x25                           0x26                           0x27                          0x28                           0x29                           0x2A                           0x2B                           0x2C                           0x2D                           0x2E                           0x2F*/
-        { "JSR",&a::JSR,&a::ABS,6,3 }, { "AND",&a::AND,&a::IZX,6,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "BIT",&a::BIT,&a::ZP0,3,2 }, { "AND",&a::AND,&a::ZP0,3,2 }, { "ROL",&a::ROL,&a::ZP0,5,2 }, { "???",&a::XXX,&a::IMP,5,1 },{ "PLP",&a::PLP,&a::IMP,4,1 }, { "AND",&a::AND,&a::IMM,2,2 }, { "ROL",&a::ROL,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,2,1 }, { "BIT",&a::BIT,&a::ABS,4,3 }, { "AND",&a::AND,&a::ABS,4,3 }, { "ROL",&a::ROL,&a::ABS,6,3 }, { "???",&a::XXX,&a::IMP,6,1 },
+        { "JSR",&a::JSR,&a::ABS,6,3 }, { "AND",&a::AND,&a::IZX,6,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "BIT",&a::BIT,&a::ZP0,3,2 }, { "AND",&a::AND,&a::ZP0,3,2 }, { "ROL",&a::ROL,&a::ZP0,5,2 }, { "???",&a::XXX,&a::IMP,5,1 },{ "PLP",&a::PLP,&a::IMP,4,1 }, { "AND",&a::AND,&a::IMM,2,2 }, { "ROL",&a::ROL,&a::ACC,2,1 }, { "???",&a::XXX,&a::IMP,2,1 }, { "BIT",&a::BIT,&a::ABS,4,3 }, { "AND",&a::AND,&a::ABS,4,3 }, { "ROL",&a::ROL,&a::ABS,6,3 }, { "???",&a::XXX,&a::IMP,6,1 },
         /*0x30                           0x31                           0x32                           0x33                          0x34                           0x35                           0x36                           0x37                          0x38                           0x39                           0x3A                           0x3B                           0x3C                           0x3D                           0x3E                           0x3F*/
         { "BMI",&a::BMI,&a::REL,2,2 }, { "AND",&a::AND,&a::IZY,5,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "NOP",&a::NOP,&a::ZPX,4,2 }, { "AND",&a::AND,&a::ZPX,4,2 }, { "ROL",&a::ROL,&a::ZPX,6,2 }, { "???",&a::XXX,&a::IMP,6,1 },{ "SEC",&a::SEC,&a::IMP,2,1 }, { "AND",&a::AND,&a::ABY,4,3 }, { "NOP",&a::NOP,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,7,1 }, { "NOP",&a::NOP,&a::ABX,4,3 }, { "AND",&a::AND,&a::ABX,4,3 }, { "ROL",&a::ROL,&a::ABX,7,3 }, { "???",&a::XXX,&a::IMP,7,1 },
         /*0x40                           0x41                           0x42                           0x43                          0x44                           0x45                           0x46                           0x47                          0x48                           0x49                           0x4A                           0x4B                           0x4C                           0x4D                           0x4E                           0x4F*/
-        { "RTI",&a::RTI,&a::IMP,6,1 }, { "EOR",&a::EOR,&a::IZX,6,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "NOP",&a::NOP,&a::ZP0,3,2 }, { "EOR",&a::EOR,&a::ZP0,3,2 }, { "LSR",&a::LSR,&a::ZP0,5,2 }, { "???",&a::XXX,&a::IMP,5,1 },{ "PHA",&a::PHA,&a::IMP,3,1 }, { "EOR",&a::EOR,&a::IMM,2,2 }, { "LSR",&a::LSR,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,2,1 }, { "JMP",&a::JMP,&a::ABS,3,3 }, { "EOR",&a::EOR,&a::ABS,4,3 }, { "LSR",&a::LSR,&a::ABS,6,3 }, { "???",&a::XXX,&a::IMP,6,1 },
+        { "RTI",&a::RTI,&a::IMP,6,1 }, { "EOR",&a::EOR,&a::IZX,6,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "NOP",&a::NOP,&a::ZP0,3,2 }, { "EOR",&a::EOR,&a::ZP0,3,2 }, { "LSR",&a::LSR,&a::ZP0,5,2 }, { "???",&a::XXX,&a::IMP,5,1 },{ "PHA",&a::PHA,&a::IMP,3,1 }, { "EOR",&a::EOR,&a::IMM,2,2 }, { "LSR",&a::LSR,&a::ACC,2,1 }, { "???",&a::XXX,&a::IMP,2,1 }, { "JMP",&a::JMP,&a::ABS,3,3 }, { "EOR",&a::EOR,&a::ABS,4,3 }, { "LSR",&a::LSR,&a::ABS,6,3 }, { "???",&a::XXX,&a::IMP,6,1 },
         /*0x50                           0x51                           0x52                           0x53                          0x54                           0x55                           0x56                           0x57                          0x58                           0x59                           0x5A                           0x5B                           0x5C                           0x5D                           0x5E                           0x5F*/
         { "BVC",&a::BVC,&a::REL,2,2 }, { "EOR",&a::EOR,&a::IZY,5,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "NOP",&a::NOP,&a::ZPX,4,2 }, { "EOR",&a::EOR,&a::ZPX,4,2 }, { "LSR",&a::LSR,&a::ZPX,6,2 }, { "???",&a::XXX,&a::IMP,6,1 },{ "CLI",&a::CLI,&a::IMP,2,1 }, { "EOR",&a::EOR,&a::ABY,4,3 }, { "NOP",&a::NOP,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,7,1 }, { "NOP",&a::NOP,&a::ABX,4,3 }, { "EOR",&a::EOR,&a::ABX,4,3 }, { "LSR",&a::LSR,&a::ABX,7,3 }, { "???",&a::XXX,&a::IMP,7,1 },
         /*0x60                           0x61                           0x62                           0x63                          0x64                           0x65                           0x66                           0x67                          0x68                           0x69                           0x6A                           0x6B                           0x6C                           0x6D                           0x6E                           0x6F*/
-        { "RTS",&a::RTS,&a::IMP,6,1 }, { "ADC",&a::ADC,&a::IZX,6,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "NOP",&a::NOP,&a::ZP0,3,2 }, { "ADC",&a::ADC,&a::ZP0,3,2 }, { "ROR",&a::ROR,&a::ZP0,5,2 }, { "???",&a::XXX,&a::IMP,5,1 },{ "PLA",&a::PLA,&a::IMP,4,1 }, { "ADC",&a::ADC,&a::IMM,2,2 }, { "ROR",&a::ROR,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,2,1 }, { "JMP",&a::JMP,&a::IND,5,3 }, { "ADC",&a::ADC,&a::ABS,4,3 }, { "ROR",&a::ROR,&a::ABS,6,3 }, { "???",&a::XXX,&a::IMP,6,1 },
+        { "RTS",&a::RTS,&a::IMP,6,1 }, { "ADC",&a::ADC,&a::IZX,6,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "NOP",&a::NOP,&a::ZP0,3,2 }, { "ADC",&a::ADC,&a::ZP0,3,2 }, { "ROR",&a::ROR,&a::ZP0,5,2 }, { "???",&a::XXX,&a::IMP,5,1 },{ "PLA",&a::PLA,&a::IMP,4,1 }, { "ADC",&a::ADC,&a::IMM,2,2 }, { "ROR",&a::ROR,&a::ACC,2,1 }, { "???",&a::XXX,&a::IMP,2,1 }, { "JMP",&a::JMP,&a::IND,5,3 }, { "ADC",&a::ADC,&a::ABS,4,3 }, { "ROR",&a::ROR,&a::ABS,6,3 }, { "???",&a::XXX,&a::IMP,6,1 },
         /*0x70                           0x71                           0x72                           0x73                          0x74                           0x75                           0x76                           0x77                          0x78                           0x79                           0x7A                           0x7B                           0x7C                           0x7D                           0x7E                           0x7F*/
         { "BVS",&a::BVS,&a::REL,2,2 }, { "ADC",&a::ADC,&a::IZY,5,2 }, { "???",&a::XXX,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,8,1 },{ "NOP",&a::NOP,&a::ZPX,4,2 }, { "ADC",&a::ADC,&a::ZPX,4,2 }, { "ROR",&a::ROR,&a::ZPX,6,2 }, { "???",&a::XXX,&a::IMP,6,1 },{ "SEI",&a::SEI,&a::IMP,2,1 }, { "ADC",&a::ADC,&a::ABY,4,3 }, { "NOP",&a::NOP,&a::IMP,2,1 }, { "???",&a::XXX,&a::IMP,7,1 }, { "NOP",&a::NOP,&a::ABX,4,3 }, { "ADC",&a::ADC,&a::ABX,4,3 }, { "ROR",&a::ROR,&a::ABX,7,3 }, { "???",&a::XXX,&a::IMP,7,1 },
         /*0x80                           0x81                           0x82                           0x83                          0x84                           0x85                           0x86                           0x87                          0x88                           0x89                           0x8A                           0x8B                           0x8C                           0x8D                           0x8E                           0x8F*/
@@ -43,7 +44,7 @@ NES_CPU::NES_CPU() {
 }
 
 uint8_t NES_CPU::read(uint16_t addr, bool readonly) {
-    return bus->read(addr);
+    return bus->read(addr, readonly);
 }
 
 void NES_CPU::write(uint16_t addr, uint8_t data) {
@@ -51,7 +52,8 @@ void NES_CPU::write(uint16_t addr, uint8_t data) {
 }
 
 uint8_t NES_CPU::fetch() {
-    if (lookup[opcode].addrmode != &NES_CPU::IMP)
+    if (lookup[opcode].addrmode != &NES_CPU::IMP &&
+        lookup[opcode].addrmode != &NES_CPU::ACC)
         fetched = read(addrAbs);
 
     return fetched;
@@ -70,6 +72,8 @@ void NES_CPU::reset() {
 
     pc = (hi << 8) | lo;
 
+    //pc = 0xC000;
+
     addrRel = 0;
     addrAbs = 0;
     fetched = 0;
@@ -79,7 +83,19 @@ void NES_CPU::reset() {
 
 void NES_CPU::clock() {
     if (cycles == 0) {
-        if (debugEnabled) printf("%s", trace().c_str());
+        if (debugEnabled) {
+            std::string expected;
+            std::getline(*debugFile, expected);
+
+            std::string actual = trace();
+            this->lineNum++;
+            if (expected.substr(0,73) != actual) {
+                printf("MISMATCH ON LINE #%d\n", this->lineNum);
+                printf("Expected: %s\n", expected.substr(0,73).c_str());
+                printf("Actual:   %s\n", actual.c_str());
+                exit(1);
+            }
+        }
 
         opcode = read(pc++);
         Instruction& inst = lookup[opcode];
@@ -95,133 +111,173 @@ void NES_CPU::clock() {
     cycles--;
 }
 
-std::string NES_CPU::disassembleInst(uint16_t addr) {
-    uint16_t line_addr = addr;
-    uint8_t oc = read(addr++, true);
-
-    std::string sInst = std::string(lookup[oc].name) + " ";
-
-    if (lookup[oc].addrmode == &NES_CPU::IMM) {
-        uint8_t val = read(addr++, true);
-
-        sInst += "#$" + hex(val, 2);
-    } else if (lookup[oc].addrmode == &NES_CPU::ZP0) {
-        uint8_t addr8 = read(addr++, true);
-
-        sInst += "$" + hex(addr8, 2);
-    } else if (lookup[oc].addrmode == &NES_CPU::ZPX) {
-        uint8_t addr8 = read(addr++, true);
-
-        sInst += "$" + hex(addr8, 2) + ",X";
-    } else if (lookup[oc].addrmode == &NES_CPU::ZPY) {
-        uint8_t addr8 = read(addr++, true);
-
-        sInst += "$" + hex(addr8, 2) + ",Y";
-    } else if (lookup[oc].addrmode == &NES_CPU::ABS) {
-        uint16_t lo = read(addr++, true);
-        uint16_t hi = read(addr++, true);
-        uint16_t val = (hi << 8) | lo;
-
-        sInst += "$" + hex(val, 4);
-    } else if (lookup[oc].addrmode == &NES_CPU::ABX) {
-        uint16_t lo = read(addr++, true);
-        uint16_t hi = read(addr++, true);
-        uint16_t val = (hi << 8) | lo;
-
-        sInst += "$" + hex(val, 4) + ",X";
-    } else if (lookup[oc].addrmode == &NES_CPU::ABY) {
-        uint16_t lo = read(addr++, true);
-        uint16_t hi = read(addr++, true);
-        uint16_t val = (hi << 8) | lo;
-
-        sInst += "$" + hex(val, 4) + ",Y";
-    } else if (lookup[oc].addrmode == &NES_CPU::IND) {
-        uint16_t lo = read(addr++, true);
-        uint16_t hi = read(addr++, true);
-        uint16_t val = (hi << 8) | lo;
-
-        sInst += "($" + hex(val, 4) + ")";
-    } else if (lookup[oc].addrmode == &NES_CPU::IZX) {
-        uint8_t val = read(addr++, true);
-
-        sInst += "($" + hex(val, 2) + ",X)";
-    } else if (lookup[oc].addrmode == &NES_CPU::IZY) {
-        uint8_t val = read(addr++, true);
-
-        sInst += "($" + hex(val, 2) + "),Y";
-    } else if (lookup[oc].addrmode == &NES_CPU::REL) {
-        int8_t offset = read(addr++, true);
-        uint16_t target = addr + offset;
-
-        sInst += "$" + hex(target, 4);
-    }
-
-    return sInst;
-}
-
-std::string NES_CPU::formatInst() const {
-    std::stringstream ss;
-
-    ss << "A:" << hex(a, 2) << " ";
-    ss << "X:" << hex(x, 2) << " ";
-    ss << "Y:" << hex(y, 2) << " ";
-    ss << "P:" << hex(status, 2) << " ";
-    ss << "SP:" << hex(sp, 2);
-
-    return ss.str();
-}
-
 std::string NES_CPU::trace() {
-    uint16_t PC = pc;
-
-    uint8_t oc = read(pc);
-
-    const Instruction& inst = lookup[oc];
-
     std::stringstream ss;
 
-    // program counter
-    ss << hex(PC, 4) << "  ";
+    uint16_t pc_start = this->pc;
+    uint8_t oc = this->read(pc_start, true);
+    auto& inst = this->lookup[oc];
 
-    // raw opcode bytes
-    uint8_t b1 = read(PC + 1, true);
-    uint8_t b2 = read(PC + 2, true);
+    uint8_t b1 = this->read(pc_start, true);
+    uint8_t b2 = this->read(pc_start + 1, true);
+    uint8_t b3 = this->read(pc_start + 2, true);
 
-    ss << hex(oc, 2) << " ";
+    ss << std::uppercase << std::hex << std::setfill('0');
 
-    if (inst.bytes >= 2)
-        ss << hex(b1, 2) << " ";
+    // PC
+    ss << std::setw(4) << pc_start << "  ";
+
+    // instruction bytes
+    ss << std::setw(2) << (int)b1 << " ";
+
+    int bytes = this->lookup[oc].bytes;
+
+    if (bytes > 1)
+        ss << std::setw(2) << (int)b2 << " ";
     else
         ss << "   ";
 
-    if (inst.bytes == 3)
-        ss << hex(b2, 2);
+    if (bytes > 2)
+        ss << std::setw(2) << (int)b3;
     else
         ss << "  ";
 
     ss << "  ";
 
-    ss << disassembleInst(PC);
+    // mnemonic
+    ss << inst.name << " ";
 
-    while (ss.str().size() < 48) {
-        ss << " ";
+    uint16_t addr = (uint16_t)b2 | ((uint16_t)b3 << 8);
+
+    // addressing mode decoding
+    if (inst.addrmode == &NES_CPU::ACC) {
+        ss << "A";
+    }
+    else if (inst.addrmode == &NES_CPU::IMP) {
+
+    }
+    else if (inst.addrmode == &NES_CPU::IMM) {
+        ss << "#$" << std::setw(2) << (int)b2;
+    }
+    else if (inst.addrmode == &NES_CPU::ZP0) {
+        uint8_t val = this->read(b2, true);
+        ss << "$" << std::setw(2) << (int)b2
+            << " = " << std::setw(2) << (int)val;
+    }
+    else if (inst.addrmode == &NES_CPU::ZPX) {
+        uint8_t eff = (b2 + x) & 0xFF;
+        uint8_t val = this->read(eff, true);
+
+        ss << "$" << std::setw(2) << (int)b2
+            << ",X @ " << std::setw(2) << (int)eff
+            << " = " << std::setw(2) << (int)val;
+    }
+    else if (inst.addrmode == &NES_CPU::ZPY) {
+        uint8_t eff = (b2 + y) & 0xFF;
+        uint8_t val = read(eff, true);
+
+        ss << "$" << std::setw(2) << (int)b2
+            << ",Y @ " << std::setw(2) << (int)eff
+            << " = " << std::setw(2) << (int)val;
+    }
+    else if (inst.addrmode == &NES_CPU::ABS) {
+        uint8_t val = this->read(addr, true);
+
+        ss << "$" << std::setw(4) << addr;
+
+        if (inst.name != "JMP" &&
+            inst.name != "JSR") ss << " = " << std::setw(2) << (int)val;
+    }
+    else if (inst.addrmode == &NES_CPU::ABX) {
+        uint16_t eff = addr + x;
+        uint8_t val = this->read(eff, true);
+
+        ss << "$" << std::setw(4) << addr
+            << ",X @ " << std::setw(4) << eff
+            << " = " << std::setw(2) << (int)val;
+    }
+    else if (inst.addrmode == &NES_CPU::ABY) {
+        uint16_t eff = addr + y;
+        uint8_t val = this->read(eff, true);
+
+        ss << "$" << std::setw(4) << addr
+            << ",Y @ " << std::setw(4) << eff
+            << " = " << std::setw(2) << (int)val;
+    }
+    else if (inst.addrmode == &NES_CPU::IND) {
+        uint16_t ptr = addr;
+        uint16_t lo = this->read(ptr, true);
+        uint16_t hi = this->read((ptr & 0xFF00) | ((ptr + 1) & 0xFF), true);
+
+        uint16_t eff = (hi << 8) | lo;
+
+        ss << "($" << std::setw(4) << ptr
+            << ") = " << std::setw(4) << eff;
+    }
+    else if (inst.addrmode == &NES_CPU::IZX) {
+        uint8_t ptr = (b2 + x) & 0xFF;
+
+        uint16_t lo = this->read(ptr, true);
+        uint16_t hi = this->read((ptr + 1) & 0xFF, true);
+
+        uint16_t eff = (hi << 8) | lo;
+
+        uint8_t val = this->read(eff, true);
+
+        ss << "($" << std::setw(2) << (int)b2
+            << ",X) @ " << std::setw(2) << (int)ptr
+            << " = " << std::setw(4) << eff
+            << " = " << std::setw(2) << (int)val;
+    }
+    else if (inst.addrmode == &NES_CPU::IZY) {
+        uint16_t lo = this->read(b2, true);
+        uint16_t hi = this->read((b2 + 1) & 0xFF, true);
+
+        uint16_t base = (hi << 8) | lo;
+        uint16_t eff = base + y;
+
+        uint8_t val = this->read(eff, true);
+
+        ss << "($" << std::setw(2) << (int)b2
+            << "),Y = " << std::setw(4) << base
+            << " @ " << std::setw(4) << eff
+            << " = " << std::setw(2) << (int)val;
+    }
+    else if (inst.addrmode == &NES_CPU::REL) {
+        int8_t offset = (int8_t)b2;
+        uint16_t target = pc_start + 2 + offset;
+
+        ss << "$" << std::setw(4) << target;
     }
 
-    ss << formatInst();
+    // align register column
+    while (ss.str().size() < 48)
+        ss << " ";
 
-    ss << std::endl;
+    // registers
+    ss << "A:" << std::setw(2) << (int)this->a;
+    ss << " X:" << std::setw(2) << (int)this->x;
+    ss << " Y:" << std::setw(2) << (int)this->y;
+    ss << " P:" << std::setw(2) << (int)this->status;
+    ss << " SP:" << std::setw(2) << (int)this->sp;
+
+    // PPU + CPU cycles
+    //ss << " PPU:" << std::dec << this->bus->ppu->scanline
+    //    << "," << std::setw(3) << this->bus->ppu->cycle;
+
+    //ss << " CYC:" << this->cycles;
 
     return ss.str();
 }
 
 void NES_CPU::IRQ() {
     if (getFlag(I) == 0) {
-        write(0x0100 + sp--, (pc >> 8) & 0x00FF);
-        write(0x0100 + sp--, pc & 0x00FF);
+        push((pc >> 8) & 0x00FF);
+        push(pc & 0x00FF);
         setFlag(B, 0);
         setFlag(U, 1);
         setFlag(I, 1);
-        write(0x0100 + sp--, status);
+        push(status);
         uint16_t lo = read(0xFFFE);
         uint16_t hi = read(0xFFFF);
         pc = (hi << 8) | lo;

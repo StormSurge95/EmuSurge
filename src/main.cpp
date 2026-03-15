@@ -2,6 +2,8 @@
 
 #include "./systems/NES/NES.h"
 
+//#define DEBUG
+
 static std::array<bool, 8> getButtons(SDL_Gamepad* gp) {
     std::array<bool, 8> buttons = {false, false, false, false, false, false, false, false};
 
@@ -36,7 +38,11 @@ static std::array<bool, 8> getButtons(SDL_Gamepad* gp) {
 }
 
 int main(int argc, int* argv[]) {
+#ifdef DEBUG
+    NES* nes = new NES(true);
+#else
     NES* nes = new NES();
+#endif
     if (!nes->loadCartridge("C:/roms/NES/Tests/nestest.nes")) return 1;
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
@@ -60,21 +66,25 @@ int main(int argc, int* argv[]) {
                 SDL_Event e;
                 bool quit = false;
 
+#ifdef DEBUG
+                std::ifstream ref("C:/Users/Redux/Desktop/Emulator Tests/NES/CPU/nestest.log");
+                if (!ref.is_open())
+                    return 2;
+
+                nes->cpu->debugFile = &ref;
+#endif
                 while (!quit) {
                     while (SDL_PollEvent(&e)) {
                         if (e.type == SDL_EVENT_QUIT)
                             quit = true;
                         else if (e.type == SDL_EVENT_GAMEPAD_ADDED) {
                             if (gamepad1 == nullptr) {
-                                printf("SETTING GAMEPAD #1\n");
                                 gamepad1 = SDL_OpenGamepad(e.gdevice.which);
                             } else {
-                                printf("SETTING GAMEPAD #2\n");
                                 gamepad2 = SDL_OpenGamepad(e.gdevice.which);
                             }
                         } else if (e.type == SDL_EVENT_GAMEPAD_REMOVED) {
                             if (gamepad1 && SDL_GetGamepadID(gamepad1) == e.gdevice.which) {
-                                printf("REMOVING GAMEPAD 1\n");
                                 SDL_CloseGamepad(gamepad1);
                                 gamepad1 = gamepad2;
                                 gamepad2 = nullptr;
@@ -82,15 +92,12 @@ int main(int argc, int* argv[]) {
                                 SDL_CloseGamepad(gamepad2);
                                 gamepad2 = nullptr;
                             }
-                        } else if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
-                            if (e.gbutton.which == SDL_GetGamepadID(gamepad1))
-                                nes->update(1, getButtons(gamepad1));
-                            else if (e.gbutton.which == SDL_GetGamepadID(gamepad2))
-                                nes->update(2, getButtons(gamepad2));
                         }
                     }
 
                     try {
+                        if (gamepad1) nes->update(1, getButtons(gamepad1));
+                        if (gamepad2) nes->update(2, getButtons(gamepad2));
                         nes->clock();
                     }
                     catch (const std::exception& e) {

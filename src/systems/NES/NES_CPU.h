@@ -4,6 +4,7 @@
 #include "../../core/Helpers.h"
 #include "NES_Bus.h"
 
+#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -67,7 +68,12 @@ class NES_CPU : public Device {
         std::vector<Instruction> lookup;
 
         inline uint8_t getFlag(FLAGS f) const { return ((status & f) > 0) ? 1 : 0; }
-        inline void setFlag(FLAGS f, bool v) { status = (v ? status |= f : status &= ~f); }
+        inline void setFlag(FLAGS f, bool v) {
+            if (v)
+                status |= f;
+            else
+                status &= ~f;
+        }
 
         inline void push(uint8_t data) {
             write(0x0100 + sp, data);
@@ -333,7 +339,8 @@ class NES_CPU : public Device {
             setFlag(Z, (t & 0xFF) == 0);
             setFlag(N, t & 0x80);
 
-            if (lookup[opcode].addrmode == &NES_CPU::IMP)
+            if (lookup[opcode].addrmode == &NES_CPU::IMP ||
+                lookup[opcode].addrmode == &NES_CPU::ACC)
                 a = t & 0xFF;
             else
                 write(addrAbs, t & 0xFF);
@@ -347,9 +354,10 @@ class NES_CPU : public Device {
 
             setFlag(C, fetched & 0x01);
             setFlag(Z, (t & 0xFF) == 0);
-            setFlag(N, t & 0x80);
+            setFlag(N, false);
 
-            if (lookup[opcode].addrmode == &NES_CPU::IMP)
+            if (lookup[opcode].addrmode == &NES_CPU::IMP ||
+                lookup[opcode].addrmode == &NES_CPU::ACC)
                 a = t & 0xFF;
             else
                 write(addrAbs, t & 0xFF);
@@ -365,7 +373,8 @@ class NES_CPU : public Device {
             setFlag(Z, t == 0);
             setFlag(N, t & 0x80);
 
-            if (lookup[opcode].addrmode == &NES_CPU::IMP)
+            if (lookup[opcode].addrmode == &NES_CPU::IMP ||
+                lookup[opcode].addrmode == &NES_CPU::ACC)
                 a = t;
             else
                 write(addrAbs, t);
@@ -381,7 +390,8 @@ class NES_CPU : public Device {
             setFlag(Z, t == 0);
             setFlag(N, t & 0x80);
 
-            if (lookup[opcode].addrmode == &NES_CPU::IMP)
+            if (lookup[opcode].addrmode == &NES_CPU::IMP ||
+                lookup[opcode].addrmode == &NES_CPU::ACC)
                 a = t;
             else
                 write(addrAbs, t);
@@ -614,6 +624,7 @@ class NES_CPU : public Device {
             push(pc & 0xFF);
 
             push(status | B | U);
+            setFlag(B, false);
 
             uint16_t lo = read(0xFFFE);
             uint16_t hi = read(0xFFFF);
@@ -712,8 +723,8 @@ class NES_CPU : public Device {
         }
 #pragma endregion
         #pragma region Debugging
-        std::string disassembleInst(uint16_t addr);
-        std::string formatInst() const;
+        std::ifstream* debugFile = nullptr;
         std::string trace();
+        unsigned long long lineNum = 0;
         #pragma endregion
 };

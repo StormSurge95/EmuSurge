@@ -13,6 +13,8 @@ NES::NES(bool d) {
     ppu = std::make_shared<NES_PPU>();
     controller1 = std::make_shared<NES_Controller>(1);
     controller2 = std::make_shared<NES_Controller>(2);
+    controller1->other = controller2;
+    controller2->other = controller1;
 
     // connect CPU to bus
     cpu->connectBus(bus);
