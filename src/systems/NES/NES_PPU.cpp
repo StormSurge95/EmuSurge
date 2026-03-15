@@ -126,7 +126,9 @@ uint8_t NES_PPU::ppuRead(uint16_t addr, bool readonly) {
             if (addr <= 0x0BFF) return nametables[A];
             return nametables[B];
         } else if (cart->getMirror() == Cartridge::HORIZONTAL) {
+            if (addr <= 0x03FF) return nametables[A];
             if (addr <= 0x07FF) return nametables[A];
+            if (addr <= 0x0BFF) return nametables[B];
             return nametables[B];
         }
     } else if (addr <= 0x3FFF) {
@@ -166,8 +168,16 @@ void NES_PPU::ppuWrite(uint16_t addr, uint8_t data) {
             nametables[B] = data;
             return;
         } else if (cart->getMirror() == Cartridge::HORIZONTAL) {
+            if (addr <= 0x03FF) {
+                nametables[A] = data;
+                return;
+            }
             if (addr <= 0x07FF) {
                 nametables[A] = data;
+                return;
+            }
+            if (addr <= 0x0BFF) {
+                nametables[B] = data;
                 return;
             }
             nametables[B] = data;
@@ -210,13 +220,12 @@ void NES_PPU::clock() {
             case 7:
                 this->fetchPatternHi();
                 break;
-            case 0:
-                this->incrementX();
-                break;
             default:
                 break;
 
         }
+        if ((this->cycle % 8) == 0 && this->cycle >= 8 && this->cycle <= 256)
+            this->incrementX();
     }
 
     // SCROLL UPDATES
@@ -280,13 +289,13 @@ void NES_PPU::incrementX() {
 
 void NES_PPU::incrementY() {
     if ((this->v & 0x7000) != 0x7000) {
-        v += 0x1000;
+        this->v += 0x1000;
     } else {
         this->v &= ~0x7000;
-        int8_t y = this->coarseY();
+        uint8_t y = this->coarseY();
         if (y == 29) {
             y = 0;
-            y ^= 0x0800;
+            this->v ^= 0x0800;
         } else if (y == 31) {
             y = 0;
         } else {

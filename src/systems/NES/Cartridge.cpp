@@ -2,9 +2,10 @@
 #include "Mappers/M000.h"
 #include "Mappers/M001.h"
 #include "Mappers/M002.h"
+#include "Mappers/M003.h"
 
 #include <fstream>
-#include <sstream>
+#include <exception>
 
 Cartridge::Cartridge(const std::string& filename) {
     // open ROM file
@@ -69,14 +70,19 @@ void Cartridge::ppuWrite(uint16_t addr, uint8_t data) {
 void Cartridge::initMapper(uint8_t id) {
     switch (id) {
         case 0:
-            mapper = std::make_unique<M000>(prgBanks, prgMemory, chrBanks, chrMemory);
+            mapper = std::make_shared<M000>(prgBanks, prgMemory, chrBanks, chrMemory);
             break;
         case 1:
-            mapper = std::make_unique<M001>(prgBanks, prgMemory, chrBanks, chrMemory);
+            mapper = std::make_shared<M001>(prgBanks, prgMemory, chrBanks, chrMemory);
             break;
         case 2:
-            mapper = std::make_unique<M002>(prgBanks, prgMemory, chrBanks, chrMemory);
+            mapper = std::make_shared<M002>(prgBanks, prgMemory, chrBanks, chrMemory);
             break;
-        default: return;
+        case 3:
+            mapper = std::make_shared<M003>(prgBanks, prgMemory, chrBanks, chrMemory);
+            break;
+        default: 
+            std::string msg = "THIS MAPPER " + std::to_string(id) + " IS CURRENTLY NOT IMPLEMENTED";
+            throw std::exception(msg.c_str());
     }
 }
