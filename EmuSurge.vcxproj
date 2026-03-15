@@ -153,11 +153,18 @@
     <ClInclude Include="src\core\Device.h" />
     <ClInclude Include="src\core\Helpers.h" />
     <ClInclude Include="src\core\IConsole.h" />
+    <ClInclude Include="src\core\IODevice.h" />
     <ClInclude Include="src\core\RAM.h" />
     <ClInclude Include="src\core\VideoTypes.h" />
     <ClInclude Include="src\systems\NES\Cartridge.h" />
+    <ClInclude Include="src\systems\NES\Mappers\Mapper.h" />
+    <ClInclude Include="src\systems\NES\Mappers\M001.h" />
+    <ClInclude Include="src\systems\NES\Mappers\M000.h" />
+    <ClInclude Include="src\systems\NES\Mappers\M002.h" />
     <ClInclude Include="src\systems\NES\NES.h" />
+    <ClInclude Include="src\systems\NES\NES_APU.h" />
     <ClInclude Include="src\systems\NES\NES_Bus.h" />
+    <ClInclude Include="src\systems\NES\NES_Controller.h" />
     <ClInclude Include="src\systems\NES\NES_CPU.h" />
     <ClInclude Include="src\systems\NES\NES_PPU.h" />
   </ItemGroup>
@@ -166,6 +173,8 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\systems\NES\Cartridge.cpp" />
     <ClCompile Include="src\systems\NES\NES.cpp" />
+    <ClCompile Include="src\systems\NES\NES_Bus.cpp" />
+    <ClCompile Include="src\systems\NES\NES_Controller.cpp" />
     <ClCompile Include="src\systems\NES\NES_CPU.cpp" />
     <ClCompile Include="src\systems\NES\NES_PPU.cpp" />
   </ItemGroup>

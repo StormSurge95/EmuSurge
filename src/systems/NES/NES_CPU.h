@@ -1,11 +1,10 @@
 #pragma once
 
-#include "../../core/Bus.h"
 #include "../../core/Device.h"
 #include "../../core/Helpers.h"
+#include "NES_Bus.h"
 
-#include <fstream>
-#include <sstream>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -15,7 +14,7 @@ class NES_CPU : public Device {
 
         uint16_t pc = 0;
 
-        inline void connectBus(Bus* b) { bus = b; }
+        inline void connectBus(std::shared_ptr<NES_Bus> b) { bus = b; }
 
         uint8_t read(uint16_t addr, bool readonly = false) override;
         void write(uint16_t addr, uint8_t data) override;
@@ -26,10 +25,11 @@ class NES_CPU : public Device {
         void IRQ();
         void NMI();
 
-        inline void attachTraceStream(std::ofstream* ts) { traceStream = ts; }
+        inline void enableDebug() { debugEnabled = true; }
 
-    private:
-        Bus* bus = nullptr;
+        std::shared_ptr<NES_Bus> bus = nullptr;
+
+        bool debugEnabled = false;
 
         uint8_t a = 0;
         uint8_t x = 0;
@@ -712,9 +712,6 @@ class NES_CPU : public Device {
         }
 #pragma endregion
         #pragma region Debugging
-        std::ofstream* traceStream = nullptr;
-        std::stringstream ss;
-
         std::string disassembleInst(uint16_t addr);
         std::string formatInst() const;
         std::string trace();

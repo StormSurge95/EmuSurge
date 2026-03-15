@@ -85,7 +85,7 @@ void NES_PPU::clock() {
 
         if (scanline >= 262) {
             scanline = 0;
-            frameComplete = false;
+            frameComplete = true;
 
             oddFrame = !oddFrame;
         }
@@ -102,19 +102,50 @@ void NES_PPU::clock() {
 
 void NES_PPU::reset() {}
 
+void NES_PPU::connectCartridge(std::shared_ptr<Cartridge> cart) {
+    this->cart = cart;
+    this->mapper = cart->mapper;
+}
+
 uint8_t NES_PPU::read(uint16_t addr, bool readonly) {
     if (addr >= 0x2000 && addr <= 0x3FFF) {
         addr &= 0x0007;
 
         switch (addr) {
-            case 0x02: // PPUSTATUS
-                if (!readonly) w = false;
-                return PPUSTATUS.value();
+            case 0x02: { // PPUSTATUS
+                uint8_t data = PPUSTATUS.value();
+                if (!readonly) {
+                    PPUSTATUS.isInVblank = false;
+                    w = false;
+                }
+                return data;
+            }
             case 0x04: // OAMDATA
                 if (readonly) return OAMDATA;
                 return primaryOAM[OAMADDR];
-            case 0x07: // PPUDATA
-                return PPUDATA;
+            case 0x07: { // PPUDATA
+                uint8_t result;
+
+                // read actual VRAM
+                uint8_t data = ppuRead(v);
+
+                // palette memory is not buffered
+                if (v >= 0x3F00 && v <= 0x3FFF) {
+                    result = data;
+                    dataBuffer = data;
+                } else {
+                    result = dataBuffer;
+                    dataBuffer = data;
+                }
+
+                // increment VRAM address
+                if (PPUCTRL.incrementBy32)
+                    v += 32;
+                else
+                    v++;
+
+                return result;
+            }
         }
     }
 
@@ -128,6 +159,7 @@ void NES_PPU::write(uint16_t addr, uint8_t data) {
         switch (addr) {
             case 0x00: // PPUCTRL
                 PPUCTRL = data;
+                t = (t & 0xF3FF) | ((uint16_t)(data & 0x03) << 10);
                 break;
             case 0x01: // PPUMASK
                 PPUMASK = data;
@@ -147,15 +179,15 @@ void NES_PPU::write(uint16_t addr, uint8_t data) {
                     fine_x = data & 0x07;
 
                     t &= ~0x001F;
-                    t |= (data >> 3) & 0x1F;
+                    t |= (uint16_t)(data >> 3) & 0x1F;
 
                     w = true;
                 } else {
                     // second write; vertical scroll (coarse y)
                     t &= 0x73E0;
 
-                    t |= (data & 0x07) << 12;
-                    t |= (data & 0xF8) << 2;
+                    t |= (uint16_t)(data & 0x07) << 12;
+                    t |= (uint16_t)(data & 0xF8) << 2;
 
                     w = false;
                 }
@@ -165,14 +197,13 @@ void NES_PPU::write(uint16_t addr, uint8_t data) {
                     //vramAddr = (data << 8) | (vramAddr & 0x00FF);
                     // first write; high byte of address
                     t &= 0x00FF;
-                    t |= (data & 0x3F) << 8;
+                    t |= (uint16_t)(data & 0x3F) << 8;
 
                     w = true;
                 } else {
-                    //vramAddr = (vramAddr & 0xFF00) | data;
                     // second write; low byte of address
                     t &= 0x7F00;
-                    t |= data;
+                    t |= (uint16_t)data;
 
                     v = t; // transfer address from t to v
 
@@ -180,7 +211,6 @@ void NES_PPU::write(uint16_t addr, uint8_t data) {
                 }
                 break;
             case 0x07: // PPU DATA
-                //ppuWrite(vramAddr, data);
                 ppuWrite(v, data);
                 if (PPUCTRL.incrementBy32) {
                     //vramAddr += 32;
@@ -194,44 +224,44 @@ void NES_PPU::write(uint16_t addr, uint8_t data) {
     }
 }
 
-bool NES_PPU::ppuRead(uint16_t addr, uint8_t& data) {
+// reads from video RAM and/or mapper-mapped address via mapper->ppuRead()
+uint8_t NES_PPU::ppuRead(uint16_t addr, bool readonly) {
     addr &= 0x3FFF;
 
-    if (cart->ppuRead(addr, data)) {
-        return true;
+    if (addr >= 0x0000 && addr <= 0x1FFF) {
+        return mapper->ppuRead(addr, readonly);
     } else if (addr >= 0x2000 && addr <= 0x3EFF) {
         addr &= 0x0FFF;
         uint16_t A = addr & 0x03FF;
         uint16_t B = (addr & 0x03FF) + 0x0400;
         if (cart->getMirror() == Cartridge::VERTICAL) {
-            if (addr <= 0x03FF) data = nametables[A];
-            else if (addr <= 0x07FF) data = nametables[B];
-            else if (addr <= 0x0BFF) data = nametables[A];
-            else data = nametables[B];
+            if (addr <= 0x03FF) return nametables[A];
+            else if (addr <= 0x07FF) return nametables[B];
+            else if (addr <= 0x0BFF) return nametables[A];
+            else return nametables[B];
         } else {
-            if (addr <= 0x03FF) data = nametables[A];
-            else if (addr <= 0x07FF) data = nametables[A];
-            else if (addr <= 0x0BFF) data = nametables[B];
-            else data = nametables[B];
+            if (addr <= 0x03FF) return nametables[A];
+            else if (addr <= 0x07FF) return nametables[A];
+            else if (addr <= 0x0BFF) return nametables[B];
+            else return nametables[B];
         }
-        return true;
     } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
         addr &= 0x001F;
         if (addr == 0x10) addr = 0x00;
         else if (addr == 0x14) addr = 0x04;
         else if (addr == 0x18) addr = 0x08;
         else if (addr == 0x1C) addr = 0x0C;
-        data = paletteRam[addr];
-        return true;
+        return paletteRam[addr];
     }
-    return false;
+
+    return 0x00;
 }
 
-bool NES_PPU::ppuWrite(uint16_t addr, uint8_t data) {
+void NES_PPU::ppuWrite(uint16_t addr, uint8_t data) {
     addr &= 0x3FFF;
 
-    if (cart->ppuWrite(addr, data)) {
-        return true;
+    if (addr >= 0x0000 && addr <= 0x1FFF) {
+        mapper->ppuWrite(addr, data);
     } else if (addr >= 0x2000 && addr <= 0x3EFF) {
         addr &= 0x0FFF;
 
@@ -248,18 +278,14 @@ bool NES_PPU::ppuWrite(uint16_t addr, uint8_t data) {
             else if (addr <= 0x0BFF) nametables[B] = data;
             else nametables[B] = data;
         }
-        return true;
     } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
-        addr &= 0x1F;
+        addr &= 0x001F;
         if (addr == 0x10) addr = 0x00;
         else if (addr == 0x14) addr = 0x04;
         else if (addr == 0x18) addr = 0x08;
         else if (addr == 0x1C) addr = 0x0C;
         paletteRam[addr] = data;
-        return true;
     }
-
-    return false;
 }
 
 const uint32_t* NES_PPU::getFrameBuffer() const {
@@ -364,9 +390,9 @@ void NES_PPU::fetchSpritePatterns() {
 
         SPRITE s;
         s.yCoord = secondaryOAM[i];
-        s.tileIndex = secondaryOAM[i + 1];
+        s.tileIndex = secondaryOAM[(size_t)i + 1];
         s.attr = SPRITE::ATTR(secondaryOAM[i + 2]);
-        s.xCoord = secondaryOAM[i + 3];
+        s.xCoord = secondaryOAM[(size_t)i + 3];
 
         uint8_t row = scanline - (s.yCoord + 1);
 
@@ -375,9 +401,8 @@ void NES_PPU::fetchSpritePatterns() {
 
         uint16_t addr = getSpriteAddress(s.tileIndex, (row & (spriteHeight() - 1)));
 
-        uint8_t p0, p1;
-        ppuRead(addr, p0);
-        ppuRead(addr + 8, p1);
+        uint8_t p0 = ppuRead(addr);
+        uint8_t p1 = ppuRead(addr + 8);
 
         if (s.attr.horizontalFlip) {
             reverseByte(p0);

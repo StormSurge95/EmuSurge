@@ -1,6 +1,10 @@
 #include "Cartridge.h"
+#include "Mappers/M000.h"
+#include "Mappers/M001.h"
+#include "Mappers/M002.h"
 
 #include <fstream>
+#include <sstream>
 
 Cartridge::Cartridge(const std::string& filename) {
     // open ROM file
@@ -25,10 +29,14 @@ Cartridge::Cartridge(const std::string& filename) {
 
     // get mapper id
     mapperID = ((header.flags7 >> 4) << 4) | (header.flags6 >> 4);
+    initMapper(mapperID);
 
-    mirror = ((header.flags6 & 0x04) ? FOUR_SCREEN : (header.flags6 & 0x01) ? VERTICAL : HORIZONTAL);
-
-    if (header.flags6 & 0x04) file.seekg(file.cur + 512);
+    mirror = ((header.flags6 & 0x08) ? FOUR_SCREEN : (header.flags6 & 0x01) ? VERTICAL : HORIZONTAL);
+    std::stringstream ss;
+    ss << "address before trainer search: " << file.tellg() << std::endl;
+    if (header.flags6 & 0x04) file.seekg(512, std::ios::cur);
+    ss << "address after trainer search:  " << file.tellg() << std::endl;
+    printf(ss.str().c_str());
 
     // read prgMemory
     prgMemory.resize((size_t)prgBanks * 16384);
@@ -46,34 +54,32 @@ Cartridge::Cartridge(const std::string& filename) {
 }
 
 uint8_t Cartridge::read(uint16_t addr, bool readonly) {
-    if (addr >= 0x8000) {
-        uint32_t mapped = addr - 0x8000;
-
-        if (prgBanks == 1)
-            mapped &= 0x3FFF;
-
-        return prgMemory[mapped];
-    }
-
-    return 0;
+    return mapper->cpuRead(addr, readonly);
 }
 
-void Cartridge::write(uint16_t addr, uint8_t data) {}
-
-bool Cartridge::ppuRead(uint16_t addr, uint8_t& data) {
-    if (addr < 0x2000) {
-        data = chrMemory[addr];
-        return true;
-    }
-    return false;
+void Cartridge::write(uint16_t addr, uint8_t data) {
+    mapper->cpuWrite(addr, data);
 }
 
-bool Cartridge::ppuWrite(uint16_t addr, uint8_t data) {
-    if (addr < 0x2000) {
-        if (chrBanks == 0) {
-            chrMemory[addr] = data;
-            return true;
-        }
+uint8_t Cartridge::ppuRead(uint16_t addr, bool readonly) {
+    return mapper->ppuRead(addr, readonly);
+}
+
+void Cartridge::ppuWrite(uint16_t addr, uint8_t data) {
+    mapper->ppuWrite(addr, data);
+}
+
+void Cartridge::initMapper(uint8_t id) {
+    switch (id) {
+        case 0:
+            mapper = std::make_unique<M000>(prgBanks, chrBanks);
+            break;
+        case 1:
+            mapper = std::make_unique<M001>(prgBanks, chrBanks);
+            break;
+        case 2:
+            mapper = std::make_unique<M002>(prgBanks, chrBanks);
+            break;
+        default: return;
     }
-    return false;
 }

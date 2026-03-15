@@ -1,48 +1,36 @@
 #pragma once
 
 #include "../../core/Bus.h"
-#include "NES_CPU.h"
-#include "NES_PPU.h"
+
+#include <array>
+#include <memory>
+
+class NES_CPU;
+class NES_PPU;
+class NES_Controller;
+class NES_APU;
+class Mapper;
 
 class NES_Bus : public Bus {
     public:
-        bool dmaActive = false;
-        uint8_t dmaPage = 0x00;
-        uint8_t dmaAddr = 0x00;
-        uint8_t dmaData = 0x00;
-        bool dmaDummy = true;
+        std::array<uint8_t, 2048> ram;
+        std::shared_ptr<NES_CPU> cpu = nullptr;
+        std::shared_ptr<NES_PPU> ppu = nullptr;
+        std::shared_ptr<NES_APU> apu = nullptr;
+        std::shared_ptr<Mapper> mapper = nullptr;
+        std::shared_ptr<NES_Controller> controller1 = nullptr;
+        std::shared_ptr<NES_Controller> controller2 = nullptr;
 
-        inline void clockDMA(const uint64_t masterCycle) {
-            if (dmaDummy) {
-                if (masterCycle & 0x01)
-                    dmaDummy = false;
-                return;
-            }
+        NES_Bus();
+        ~NES_Bus() = default;
 
-            // hold devices for convenience
-            NES_CPU* cpu = dynamic_cast<NES_CPU*>(mappings.find("CPU")->second.device);
-            NES_PPU* ppu = dynamic_cast<NES_PPU*>(mappings.find("PPU")->second.device);
-            
-            if ((masterCycle & 0x01) == 0) {
-                dmaData = cpu->read(((uint16_t)dmaPage << 8) | dmaAddr);
-            } else {
-                ppu->writeDMAByte(dmaData);
-                dmaAddr++;
+        uint8_t read(uint16_t addr, bool readonly = false) override;
+        void write(uint16_t addr, uint8_t data);
 
-                if (dmaAddr == 0x00) {
-                    dmaActive = false;
-                    dmaDummy = true;
-                }
-            }
-        }
-
-        inline void write(uint16_t addr, uint8_t data) {
-            if (addr == 0x4014) {
-                dmaActive = true;
-                dmaPage = data;
-                dmaAddr = 0x00;
-                dmaDummy = true;
-                dynamic_cast<NES_PPU*>(mappings.find("PPU")->second.device)->write(0x2003, 0x00);
-            } else Bus::write(addr, data);
-        }
+        void connectCPU(std::shared_ptr<NES_CPU> cpu) { this->cpu = cpu; }
+        void connectPPU(std::shared_ptr<NES_PPU> ppu) { this->ppu = ppu; }
+        void connectAPU(std::shared_ptr<NES_APU> apu) { this->apu = apu; }
+        void connectMapper(std::shared_ptr<Mapper> mapper) { this->mapper = mapper; }
+        void connectController(std::shared_ptr<NES_Controller> c, uint8_t player);
+        void disconnectController(uint8_t player);
 };

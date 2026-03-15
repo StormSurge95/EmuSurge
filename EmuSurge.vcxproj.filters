@@ -31,6 +31,9 @@
     <Filter Include="Header Files\systems\NES">
       <UniqueIdentifier>{47e52f69-8966-4f8d-9a68-03f002252e58}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\systems\NES\Mappers">
+      <UniqueIdentifier>{10f85465-3d8b-4a7d-a431-b302d0a02274}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\core\Bus.h">
@@ -66,6 +69,27 @@
     <ClInclude Include="src\systems\NES\NES_Bus.h">
       <Filter>Header Files\systems\NES</Filter>
     </ClInclude>
+    <ClInclude Include="src\systems\NES\Mappers\Mapper.h">
+      <Filter>Header Files\systems\NES\Mappers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\systems\NES\Mappers\M000.h">
+      <Filter>Header Files\systems\NES\Mappers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\systems\NES\Mappers\M002.h">
+      <Filter>Header Files\systems\NES\Mappers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\systems\NES\Mappers\M001.h">
+      <Filter>Header Files\systems\NES\Mappers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\systems\NES\NES_Controller.h">
+      <Filter>Header Files\systems\NES</Filter>
+    </ClInclude>
+    <ClInclude Include="src\systems\NES\NES_APU.h">
+      <Filter>Header Files\systems\NES</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\IODevice.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\frontend\SDLRenderer.cpp">
@@ -85,6 +109,12 @@
     </ClCompile>
     <ClCompile Include="src\main.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\systems\NES\NES_Bus.cpp">
+      <Filter>Source Files\systems\NES</Filter>
+    </ClCompile>
+    <ClCompile Include="src\systems\NES\NES_Controller.cpp">
+      <Filter>Source Files\systems\NES</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -1,7 +1,8 @@
-#include "NES_CPU.h"
 #include "../../core/Helpers.h"
+#include "NES_CPU.h"
 
 #include <sstream>
+#include <vector>
 
 NES_CPU::NES_CPU() {
     using a = NES_CPU;
@@ -69,6 +70,8 @@ void NES_CPU::reset() {
 
     pc = (hi << 8) | lo;
 
+    pc = 0xC000;
+
     addrRel = 0;
     addrAbs = 0;
     fetched = 0;
@@ -78,7 +81,8 @@ void NES_CPU::reset() {
 
 void NES_CPU::clock() {
     if (cycles == 0) {
-        if (traceStream) *traceStream << trace();
+        if (debugEnabled) printf("%s", trace().c_str());
+
         opcode = read(pc++);
         Instruction& inst = lookup[opcode];
 

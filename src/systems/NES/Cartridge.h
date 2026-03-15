@@ -1,8 +1,10 @@
 #pragma once
 
 #include "../../core/Device.h"
+#include "Mappers/Mapper.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -26,15 +28,19 @@ class Cartridge : public Device {
             FOUR_SCREEN
         };
 
+        std::shared_ptr<Mapper> mapper = nullptr;
+
         Cartridge(const std::string& filename);
+
+        void clock() { mapper->clock(); };
 
         bool isValid() const { return valid; }
 
         uint8_t read(uint16_t addr, bool readonly = false) override;
         void write(uint16_t addr, uint8_t data) override;
 
-        bool ppuRead(uint16_t addr, uint8_t& data);
-        bool ppuWrite(uint16_t addr, uint8_t data);
+        uint8_t ppuRead(uint16_t addr, bool readonly = false);
+        void ppuWrite(uint16_t addr, uint8_t data);
 
         inline MIRROR getMirror() const { return mirror; }
 
@@ -46,6 +52,8 @@ class Cartridge : public Device {
         uint8_t chrBanks = 0;
         MIRROR mirror = HORIZONTAL;
 
-        std::vector<uint8_t> prgMemory;
-        std::vector<uint8_t> chrMemory;
+        std::vector<uint8_t> prgMemory{ 0 };
+        std::vector<uint8_t> chrMemory{ 0 };
+
+        void initMapper(uint8_t mapperID);
 };

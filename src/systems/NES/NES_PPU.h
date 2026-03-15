@@ -2,9 +2,12 @@
 
 #include <array>
 #include <cstdint>
+#include <memory>
 
 #include "../../core/Device.h"
 #include "Cartridge.h"
+#include "Mappers/Mapper.h"
+#include "NES_CPU.h"
 
 class NES_PPU : public Device {
     public:
@@ -20,16 +23,18 @@ class NES_PPU : public Device {
         uint8_t read(uint16_t addr, bool readonly = false) override;
         void write(uint16_t addr, uint8_t data) override;
 
-        bool ppuRead(uint16_t addr, uint8_t& data);
-        bool ppuWrite(uint16_t addr, uint8_t data);
+        uint8_t ppuRead(uint16_t addr, bool readonly = false);
+        void ppuWrite(uint16_t addr, uint8_t data);
 
         const uint32_t* getFrameBuffer() const;
-        inline void connectCartridge(Cartridge* cartridge) { cart = cartridge; }
+        void connectCartridge(std::shared_ptr<Cartridge> cartridge);
 
         bool writeDMAByte(uint8_t data);
 
     private:
-        Cartridge* cart = nullptr;
+        std::shared_ptr<Cartridge> cart = nullptr;
+        std::shared_ptr<Mapper> mapper = nullptr;
+        std::shared_ptr<NES_CPU> cpu;
         bool oddFrame = false;
 
         // CPU visible registers
@@ -120,6 +125,7 @@ class NES_PPU : public Device {
         uint8_t PPUSCROLL = 0x00;
         uint8_t PPUADDR = 0x00;
         uint8_t PPUDATA = 0x00;
+        uint8_t dataBuffer = 0x00;
         uint8_t OAMDMA = 0x00;
 
         uint16_t cycle = 0x0000;
@@ -176,6 +182,20 @@ class NES_PPU : public Device {
         uint16_t ntbase = 0;
         uint16_t bptbase = 0;
 
+        //void onPreLine();
+        //void onVisibleLine();
+        //void onVBlankLine();
+        //void renderScanlineBG();
+        //void plotBG(uint16_t x, uint16_t y, uint32_t c, uint8_t ci);
+        //uint32_t getColor(uint8_t palette, uint8_t index);
+        //uint8_t getBackgroundPaletteID(uint8_t nametable, uint16_t x, uint16_t y);
+        inline uint8_t nametableID(uint8_t x) const {
+            uint16_t base = PPUCTRL.nametableBase;
+            int offsets[4] = { 1, -1, 1, -1 };
+            uint16_t offset =
+                x >= 256 ? offsets[base] : 0;
+            return base + offset;
+        }
 
         inline void triggerNMI() { nmiRequested = true; }
 
@@ -218,14 +238,14 @@ class NES_PPU : public Device {
             attrShiftHi = (attrShiftHi & 0xFF00) | ((nextAttributeByte & 0b10) ? 0xFF : 0x00);
         }
         inline void fetchNametableByte() {
-            uint16_t addr = nametableBaseAddr() | (v & 0x0FFF);
+            uint16_t addr = 0x2000 | (v & 0x0FFF);
             ppuRead(addr, nextNametableByte);
         }
         inline void fetchAttributeByte() {
-            uint16_t addr = (nametableBaseAddr() + 0x03C0) |
+            uint16_t addr = 0x23C0 |
                 (v & 0x0C00) |
-                ((coarseY() >> 2) << 3) |
-                (coarseX() >> 2);
+                ((v >> 4) & 0x38) |
+                ((v >> 2) & 0x07);
             ppuRead(addr, nextAttributeByte);
 
             if (coarseY() & 0x02) nextAttributeByte >>= 4;
@@ -289,21 +309,21 @@ class NES_PPU : public Device {
                     verticalFlip = !!(b & 0b10000000);
                     horizontalFlip = !!(b & 0b01000000);
                     priority = !!(b & 0b00100000);
-                    palette = (b & 0x00001100) >> 2;
+                    palette = (b & 0x00000011);
                 }
 
                 ATTR& operator=(uint8_t b) {
                     verticalFlip = !!(b & 0b10000000);
                     horizontalFlip = !!(b & 0b01000000);
                     priority = !!(b & 0b00100000);
-                    palette = (b & 0x00001100) >> 2;
+                    palette = (b & 0x00000011);
                 }
 
                 uint8_t value() const {
                     return ((+verticalFlip << 7) |
                             (+horizontalFlip << 6) |
                             (+priority << 5) |
-                            (palette << 2));
+                            (palette));
                 }
             } attr{};
             uint8_t xCoord = 0x00;
