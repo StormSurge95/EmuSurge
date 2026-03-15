@@ -21,6 +21,13 @@ class NES_Bus : public Bus {
         std::shared_ptr<NES_Controller> controller1 = nullptr;
         std::shared_ptr<NES_Controller> controller2 = nullptr;
 
+        bool dmaActive = false; // DMA in progress
+        bool dmaDummy = true;   // alignment cycle
+
+        uint8_t dmaPage = 0x00; // source page
+        uint8_t dmaAddr = 0x00; // index 0-255
+        uint8_t dmaData = 0x00; // temp read byte
+
         NES_Bus();
         ~NES_Bus() = default;
 
@@ -33,4 +40,5 @@ class NES_Bus : public Bus {
         void connectCartridge(std::shared_ptr<Cartridge> cart) { this->cart = cart; }
         void connectController(std::shared_ptr<NES_Controller> c, uint8_t player);
         void disconnectController(uint8_t player);
+        void clockDMA(uint64_t systemClock);
 };

@@ -157,6 +157,7 @@
     <ClInclude Include="src\core\RAM.h" />
     <ClInclude Include="src\core\VideoTypes.h" />
     <ClInclude Include="src\systems\NES\Cartridge.h" />
+    <ClInclude Include="src\systems\NES\Mappers\M003.h" />
     <ClInclude Include="src\systems\NES\Mappers\Mapper.h" />
     <ClInclude Include="src\systems\NES\Mappers\M001.h" />
     <ClInclude Include="src\systems\NES\Mappers\M000.h" />

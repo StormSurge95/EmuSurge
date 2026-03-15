@@ -58,11 +58,11 @@ void NES::clock() {
         ppu.get()->clock();
 
         if (systemClockCounter % 3 == 0) {
-            //if (bus->dmaActive) bus->clockDMA(systemClockCounter);
-            //else {
+            if (bus->dmaActive) bus->clockDMA(systemClockCounter);
+            else {
                 cart->clock();
                 cpu->clock();
-            //}
+            }
         }
 
         if (ppu.get()->nmiRequested) {

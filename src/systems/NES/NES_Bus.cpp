@@ -34,6 +34,11 @@ void NES_Bus::write(uint16_t addr, uint8_t data) {
         return this->write(0x0000 + (addr - 0x0800) % 0x0800, data);
     } else if (addr >= 0x2000 && addr <= 0x2007) {
         return this->ppu->write(addr, data);
+    } else if (addr == 0x4014) {
+        this->dmaPage = data;
+        this->dmaAddr = 0x00;
+        this->dmaActive = true;
+        this->dmaDummy = true;
     } else if (addr >= 0x4000 && addr <= 0x4015) {
         // APU Registers
         // PPU's OAMDMA register
@@ -54,5 +59,29 @@ void NES_Bus::connectController(std::shared_ptr<NES_Controller> c, uint8_t playe
         this->controller2 = c;
         this->controller1->other = this->controller2;
         this->controller2->other = this->controller1;
+    }
+}
+
+void NES_Bus::clockDMA(uint64_t systemClock) {
+    if (this->dmaDummy) {
+        if (systemClock % 2 == 1) {
+            dmaDummy = false;
+        }
+    } else {
+        if (systemClock % 2 == 0) {
+            // READ from CPU memory
+            this->dmaData = this->read(((uint16_t)dmaPage << 8) | dmaAddr);
+        } else {
+            // WRITE to PPU OAM
+            uint8_t index = (this->ppu->OAMADDR + dmaAddr) & 0xFF;
+            this->ppu->primaryOAM[index] = dmaData;
+
+            dmaAddr++;
+
+            if (dmaAddr == 0x00) {
+                dmaActive = false;
+                dmaDummy = true;
+            }
+        }
     }
 }

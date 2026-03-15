@@ -12,33 +12,39 @@ uint8_t NES_PPU::read(uint16_t addr, bool readonly) {
         switch (addr) {
             case 0x02: // PPUSTATUS
             {
-                uint8_t ret = this->PPUSTATUS.value();
+                uint8_t ret = (this->PPUSTATUS.value() & 0xE0) | (this->ppuBus & 0x1F);
                 if (!readonly) {
                     this->PPUSTATUS.isInVblank = false;
                     this->w = false;
+
+                    this->nmiOutput = this->PPUSTATUS.isInVblank && this->PPUCTRL.nmiEnabled;
                 }
+                this->ppuBus = ret;
                 return ret;
             }
-            case 0x04: // OAMDATA
-                if (this->PPUSTATUS.isInVblank)
-                    return this->primaryOAM[OAMADDR];
-                return this->OAMDATA;
+            case 0x04: { // OAMDATA
+                uint8_t ret = this->primaryOAM[OAMADDR];
+                this->ppuBus = ret;
+                return ret;
+            }
             case 0x07: // PPUDATA
             {
                 uint8_t ret = 0x00;
 
-                uint8_t data = ppuRead(this->v);
+                uint16_t addr = this->v & 0x3FFF;
+                uint8_t data = this->ppuRead(addr);
 
-                if (this->v >= 0x3F00 && this->v <= 0x3FFF) {
+                if (addr >= 0x3F00) {
                     ret = data;
-                    this->dataBuffer = data;
+                    this->dataBuffer = this->ppuRead(addr - 0x1000);
                 } else {
                     ret = this->dataBuffer;
                     this->dataBuffer = data;
                 }
 
-                this->v += this->PPUCTRL.incrementMode();
+                this->v = (this->v + this->PPUCTRL.incrementMode()) & 0x3FFF;
 
+                this->ppuBus = ret;
                 return ret;
             }
         }
@@ -50,14 +56,25 @@ uint8_t NES_PPU::read(uint16_t addr, bool readonly) {
 // Performs intra-device write operations on the various
 // registers that are visible to other devices for writing.
 void NES_PPU::write(uint16_t addr, uint8_t data) {
+    this->ppuBus = data;
     if (addr >= 0x2000 && addr <= 0x3FFF) {
         addr &= 0x0007;
 
         switch (addr) {
-            case 0x00: // PPUCTRL
+            case 0x00: { // PPUCTRL
+                bool oldNMI = this->PPUCTRL.nmiEnabled;
+
                 this->PPUCTRL = data;
                 this->t = ((this->t & 0xF3FF) | ((uint16_t)(data & 0x03) << 10));
+
+                this->nmiOutput = this->PPUSTATUS.isInVblank && this->PPUCTRL.nmiEnabled;
+
+                if (!this->nmiOutputPrev && this->nmiOutput)
+                    this->triggerNMI();
+
+                this->nmiOutputPrev = this->nmiOutput;
                 return;
+            }
             case 0x01: // PPUMASK
                 this->PPUMASK = data;
                 return;
@@ -65,8 +82,7 @@ void NES_PPU::write(uint16_t addr, uint8_t data) {
                 this->OAMADDR = data;
                 return;
             case 0x04: // OAMDATA
-                this->OAMDATA = data;
-                this->primaryOAM[OAMADDR] = this->OAMDATA;
+                this->primaryOAM[OAMADDR] = data;
                 this->OAMADDR++;
                 return;
             case 0x05: // PPUSCROLL
@@ -79,7 +95,7 @@ void NES_PPU::write(uint16_t addr, uint8_t data) {
 
                     this->w = true;
                 } else { // second write
-                    this->t &= 0x73E0;
+                    this->t &= 0x0C1F;
 
                     this->t |= ((uint16_t)(data & 0x07) << 12);
                     this->t |= ((uint16_t)(data & 0xF8) << 2);
@@ -97,7 +113,7 @@ void NES_PPU::write(uint16_t addr, uint8_t data) {
                     this->t &= 0x7F00;
                     this->t |= ((uint16_t)data);
 
-                    this->v = this->t;
+                    this->v = this->t & 0x3FFF;
 
                     this->w = false;
                 }
@@ -105,7 +121,7 @@ void NES_PPU::write(uint16_t addr, uint8_t data) {
             case 0x07: // PPUDATA
                 this->PPUDATA = data;
                 this->ppuWrite(this->v, this->PPUDATA);
-                this->v += this->PPUCTRL.incrementMode();
+                this->v = (this->v + this->PPUCTRL.incrementMode()) & 0x3FFF;
                 return;
         }
     }
@@ -200,7 +216,7 @@ void NES_PPU::clock() {
     }
 
     // SHIFT BACKGROUND REGISTERS
-    if (((this->cycle >= 2 && this->cycle <= 257) || (this->cycle >= 322 && this->cycle <= 337))) {
+    if (this->rendering() && ((this->cycle >= 1 && this->cycle <= 256) || (this->cycle >= 322 && this->cycle <= 337))) {
         this->shiftBackground();
     }
 
@@ -224,7 +240,7 @@ void NES_PPU::clock() {
                 break;
 
         }
-        if ((this->cycle % 8) == 0 && this->cycle >= 8 && this->cycle <= 256)
+        if ((this->cycle % 8) == 0 && ((this->cycle >= 8 && this->cycle <= 256) || this->cycle == 328 || this->cycle == 336))
             this->incrementX();
     }
 
@@ -243,13 +259,16 @@ void NES_PPU::clock() {
     // VBLANK EVENT
     if (this->scanline == 241 && this->cycle == 1) {
         this->PPUSTATUS.isInVblank = true;
-        if (this->PPUCTRL.nmiEnabled) {
-            this->triggerNMI();
-        }
     }
 
+    this->nmiOutput = this->PPUSTATUS.isInVblank && this->PPUCTRL.nmiEnabled;
+    if (!this->nmiOutputPrev && nmiOutput)
+        this->triggerNMI();
+
+    this->nmiOutputPrev = nmiOutput;
+
     // PRE-RENDER EVENT
-    if (this->scanline == 261 && this->cycle == 1) {
+    if (this->scanline == 260 && this->cycle == 331) {
         this->PPUSTATUS.isInVblank = false;
         this->PPUSTATUS.spriteOverflow = false;
         this->PPUSTATUS.spriteZeroHit = false;
@@ -371,6 +390,13 @@ void NES_PPU::renderPixel() {
     if (!this->PPUMASK.enableBackground) {
         pixel = 0;
         attr = 0;
+    }
+
+    if ((this->cycle - 1) < 8) {
+        if (!this->PPUMASK.enableBackgroundLeft) {
+            pixel = 0;
+            attr = 0;
+        }
     }
 
     uint16_t paletteAddr = 0x3F00;

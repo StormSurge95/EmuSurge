@@ -4,7 +4,7 @@
 
 //#define DEBUG
 
-const std::string PATH = "C:/roms/NES/Tests/PPU/test_ppu_read_buffer.nes";
+const std::string PATH = "C:/roms/NES/Super_Mario_Bros.nes";
 
 static std::array<bool, 8> getButtons(SDL_Gamepad* gp) {
     std::array<bool, 8> buttons = {false, false, false, false, false, false, false, false};
@@ -64,7 +64,7 @@ int main(int argc, int* argv[]) {
                 SDL_SetDefaultTextureScaleMode(ren, SDL_SCALEMODE_PIXELART);
                 SDL_SetRenderLogicalPresentation(ren, WIDTH, HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX);
 
-                SDL_Texture* tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB32, SDL_TEXTUREACCESS_STATIC, WIDTH, HEIGHT);
+                SDL_Texture* tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, WIDTH, HEIGHT);
                 if (tex != nullptr) {
                     SDL_Event e;
                     bool quit = false;

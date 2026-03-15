@@ -90,6 +90,9 @@
     <ClInclude Include="src\core\IODevice.h">
       <Filter>Header Files\core</Filter>
     </ClInclude>
+    <ClInclude Include="src\systems\NES\Mappers\M003.h">
+      <Filter>Header Files\systems\NES\Mappers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\frontend\SDLRenderer.cpp">

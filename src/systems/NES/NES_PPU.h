@@ -10,10 +10,13 @@
 
 class NES_PPU : public Device {
     public:
+        bool nmiOutput = false;
+        bool nmiOutputPrev = false;
         bool nmiRequested = false;
         bool frameComplete = false;
         uint16_t scanline = 0;
         uint16_t cycle = 0;
+        std::array<uint8_t, 256> primaryOAM{ 0 };
 
         NES_PPU();
         ~NES_PPU() = default;
@@ -30,7 +33,6 @@ class NES_PPU : public Device {
         const uint32_t* getFrameBuffer() const { return frameBuffer.data(); }
         void connectCartridge(std::shared_ptr<Cartridge> cart) { this->cart = cart; }
 
-    private:
         bool oddFrame = false;
         std::shared_ptr<Cartridge> cart = nullptr;
         std::shared_ptr<NES_CPU> cpu = nullptr;
@@ -47,7 +49,6 @@ class NES_PPU : public Device {
         };
         std::array<uint8_t, 4096> nametables{ 0 };
         std::array<uint8_t, 32> palettes{ 0 };
-        std::array<uint8_t, 256> primaryOAM{ 0 };
 
         // REGISTERS
         struct control {
@@ -155,6 +156,7 @@ class NES_PPU : public Device {
             bool isInVblank = false;
             uint8_t openBus = 0;
 
+            status() = default;
             status(uint8_t value) {
                 this->isInVblank = !!(value & (1 << 7));
                 this->spriteZeroHit = !!(value & (1 << 6));
@@ -180,12 +182,12 @@ class NES_PPU : public Device {
             }
         } PPUSTATUS = 0xA0;
         uint8_t OAMADDR = 0;
-        uint8_t OAMDATA = 0;
         uint8_t PPUSCROLL = 0;
         uint8_t PPUADDR = 0;
         uint8_t PPUDATA = 0;
         uint8_t OAMDMA = 0;
         uint8_t dataBuffer = 0;
+        uint8_t ppuBus = 0x00;
 
         uint16_t v = 0;  // during rendering, used for scroll position; outside rendering, used as current VRAM address
         uint16_t t = 0;  // during rendering, specifies starting coarse-x scroll for next scanline and starting y scroll for screen; outside rendering, holds scroll or VRAM before transferring it to v
